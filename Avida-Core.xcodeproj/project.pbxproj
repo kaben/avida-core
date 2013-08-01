@@ -190,6 +190,15 @@
 		70FA3F84164425EB0003971F /* cHardwareBCR.h in Headers */ = {isa = PBXBuildFile; fileRef = 70FA3F82164425EA0003971F /* cHardwareBCR.h */; };
 		70FA7AC8138C308000DC70D4 /* libavida-core.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 7023EC330C0A426900362B9C /* libavida-core.a */; };
 		70FA7AC9138C308500DC70D4 /* libviewer-core.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 706C7B64125F64B000EDB4B9 /* libviewer-core.a */; };
+		DC68694517A9EE530015907A /* libgtest.a in Frameworks */ = {isa = PBXBuildFile; fileRef = DC68694417A9EE530015907A /* libgtest.a */; };
+		DC68694817A9EEE30015907A /* Strand.cc in Sources */ = {isa = PBXBuildFile; fileRef = DC68694617A9EEE30015907A /* Strand.cc */; };
+		DC68694B17A9F28B0015907A /* cStrand.cc in Sources */ = {isa = PBXBuildFile; fileRef = DC68694917A9F28B0015907A /* cStrand.cc */; };
+		DC68694C17A9F28B0015907A /* cStrand.h in Headers */ = {isa = PBXBuildFile; fileRef = DC68694A17A9F28B0015907A /* cStrand.h */; };
+		DCB57C4D17A9E843001CCD72 /* libavida-core.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 7023EC330C0A426900362B9C /* libavida-core.a */; };
+		DCB57C4F17A9E843001CCD72 /* libtcmalloc-1.4.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 704C629C160CA6CC004E9B25 /* libtcmalloc-1.4.a */; };
+		DCB57C5017A9E843001CCD72 /* libapto.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 70FEF6231381B04500A9D082 /* libapto.a */; };
+		DCB57C5217A9E843001CCD72 /* unit-tests in CopyFiles */ = {isa = PBXBuildFile; fileRef = 70B6514C0BEA6FAD002472ED /* unit-tests */; };
+		DCB57C5917A9E87E001CCD72 /* main.cc in Sources */ = {isa = PBXBuildFile; fileRef = 70F962C1135AA2E7008EDD1C /* main.cc */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -239,6 +248,16 @@
 			dstSubfolderSpec = 16;
 			files = (
 				70B651B70BEA9AEC002472ED /* unit-tests in CopyFiles */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DCB57C5117A9E843001CCD72 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = work;
+			dstSubfolderSpec = 16;
+			files = (
+				DCB57C5217A9E843001CCD72 /* unit-tests in CopyFiles */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -819,6 +838,11 @@
 		BBDE4FF80FC1B06600CC6170 /* cDemePredicate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = cDemePredicate.h; sourceTree = "<group>"; };
 		D7FB16D50ED62684002E939E /* cOrgMessage.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = cOrgMessage.cc; sourceTree = "<group>"; };
 		D86E627014F6BA6600AE1489 /* cMigrationMatrix.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = cMigrationMatrix.h; sourceTree = "<group>"; };
+		DC68694417A9EE530015907A /* libgtest.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libgtest.a; path = "../../../../Library/Developer/Xcode/DerivedData/Avida-abygrzrhewcwzjcfwmlapguyzohy/Build/Products/Debug/libgtest.a"; sourceTree = "<group>"; };
+		DC68694617A9EEE30015907A /* Strand.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Strand.cc; sourceTree = "<group>"; };
+		DC68694917A9F28B0015907A /* cStrand.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = cStrand.cc; sourceTree = "<group>"; };
+		DC68694A17A9F28B0015907A /* cStrand.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = cStrand.h; sourceTree = "<group>"; };
+		DCB57C5617A9E843001CCD72 /* unit-tests */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "unit-tests"; sourceTree = BUILT_PRODUCTS_DIR; };
 		DCC3164D07626CF3008F7A48 /* avida */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = avida; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -857,6 +881,17 @@
 				70FA7AC9138C308500DC70D4 /* libviewer-core.a in Frameworks */,
 				704C629E160CA6CC004E9B25 /* libtcmalloc-1.4.a in Frameworks */,
 				704C62A0160CA6D9004E9B25 /* libapto.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DCB57C4C17A9E843001CCD72 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DCB57C4F17A9E843001CCD72 /* libtcmalloc-1.4.a in Frameworks */,
+				DC68694517A9EE530015907A /* libgtest.a in Frameworks */,
+				DCB57C5017A9E843001CCD72 /* libapto.a in Frameworks */,
+				DCB57C4D17A9E843001CCD72 /* libavida-core.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1507,6 +1542,7 @@
 			children = (
 				70F962BF135AA2E7008EDD1C /* Genome.cc */,
 				70F962C0135AA2E7008EDD1C /* Sequence.cc */,
+				DC68694617A9EEE30015907A /* Strand.cc */,
 			);
 			path = core;
 			sourceTree = "<group>";
@@ -1540,6 +1576,7 @@
 		DCC30C490762532C008F7A48 = {
 			isa = PBXGroup;
 			children = (
+				DC68694417A9EE530015907A /* libgtest.a */,
 				703549221333E30800D3865C /* include */,
 				DCC30C670762539A008F7A48 /* source */,
 				70F962BD135AA2E7008EDD1C /* unittests */,
@@ -1618,6 +1655,8 @@
 				706D30CC0852328F00D7DC8F /* tInstLib.h */,
 				706C703E0B83FB95003174C1 /* tInstLibEntry.h */,
 				705260BB0B87A7DB0007426F /* cInstLibEntry.h */,
+				DC68694917A9F28B0015907A /* cStrand.cc */,
+				DC68694A17A9F28B0015907A /* cStrand.h */,
 			);
 			path = cpu;
 			sourceTree = "<group>";
@@ -1805,6 +1844,7 @@
 				7023EC330C0A426900362B9C /* libavida-core.a */,
 				706C7B64125F64B000EDB4B9 /* libviewer-core.a */,
 				7038246F14DC3C38003C6901 /* avida-viewer */,
+				DCB57C5617A9E843001CCD72 /* unit-tests */,
 			);
 			name = products;
 			sourceTree = "<group>";
@@ -1821,6 +1861,7 @@
 				705E53D116A7102100392BA7 /* Manager.h in Headers */,
 				705E53D816A7109300392BA7 /* Types.h in Headers */,
 				705E53DA16A7119300392BA7 /* Socket.h in Headers */,
+				DC68694C17A9F28B0015907A /* cStrand.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1903,6 +1944,23 @@
 			productReference = 70B6514C0BEA6FAD002472ED /* unit-tests */;
 			productType = "com.apple.product-type.tool";
 		};
+		DCB57C4817A9E843001CCD72 /* unit-tests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DCB57C5317A9E843001CCD72 /* Build configuration list for PBXNativeTarget "unit-tests" */;
+			buildPhases = (
+				DCB57C4917A9E843001CCD72 /* Sources */,
+				DCB57C4C17A9E843001CCD72 /* Frameworks */,
+				DCB57C5117A9E843001CCD72 /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "unit-tests";
+			productName = "unit-tests";
+			productReference = DCB57C5617A9E843001CCD72 /* unit-tests */;
+			productType = "com.apple.product-type.tool";
+		};
 		DCC3164C07626CF3008F7A48 /* avida */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 702442D20859E0B00059BD9B /* Build configuration list for PBXNativeTarget "avida" */;
@@ -1948,6 +2006,7 @@
 				7038246E14DC3C38003C6901 /* avida-viewer */,
 				7023EC320C0A426900362B9C /* avida-core (static) */,
 				706C7B63125F64B000EDB4B9 /* avida-viewer (static) */,
+				DCB57C4817A9E843001CCD72 /* unit-tests */,
 			);
 		};
 /* End PBXProject section */
@@ -2082,6 +2141,7 @@
 				705E53D516A7103600392BA7 /* File.cc in Sources */,
 				705E53D616A7103600392BA7 /* Manager.cc in Sources */,
 				705E53DC16A7162600392BA7 /* Socket.cc in Sources */,
+				DC68694B17A9F28B0015907A /* cStrand.cc in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2131,6 +2191,15 @@
 			files = (
 				70B6514F0BEA6FCC002472ED /* main.cc in Sources */,
 				7020699C0FDFEB7900B77E39 /* cBitArray.cc in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DCB57C4917A9E843001CCD72 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DCB57C5917A9E87E001CCD72 /* main.cc in Sources */,
+				DC68694817A9EEE30015907A /* Strand.cc in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2309,6 +2378,48 @@
 			};
 			name = Release;
 		};
+		DCB57C5417A9E843001CCD72 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				HEADER_SEARCH_PATHS = (
+					include/public/,
+					include/private/,
+					../libs/apto/include/,
+					../libs/apto/utils/unittest/googletest/include,
+					source/,
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"$(SRCROOT)/../libs/apto/build/Debug\"",
+					"\"$(SRCROOT)/../libs/tcmalloc-1.4/build/Debug\"",
+					"\"$(SRCROOT)/../../../../Library/Developer/Xcode/DerivedData/Avida-erkyibleqpjktofbblmkfuehtmqd/Build/Products/Debug\"",
+					"\"$(SRCROOT)/../../../../Library/Developer/Xcode/DerivedData/Avida-abygrzrhewcwzjcfwmlapguyzohy/Build/Products/Debug\"",
+				);
+				PRODUCT_NAME = "unit-tests";
+			};
+			name = Debug;
+		};
+		DCB57C5517A9E843001CCD72 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				HEADER_SEARCH_PATHS = (
+					include/public/,
+					include/private/,
+					../libs/apto/include/,
+					../libs/apto/utils/unittest/googletest/include,
+					source/,
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"$(SRCROOT)/../libs/apto/build/Debug\"",
+					"\"$(SRCROOT)/../libs/tcmalloc-1.4/build/Debug\"",
+					"\"$(SRCROOT)/../../../../Library/Developer/Xcode/DerivedData/Avida-erkyibleqpjktofbblmkfuehtmqd/Build/Products/Debug\"",
+					"\"$(SRCROOT)/../../../../Library/Developer/Xcode/DerivedData/Avida-abygrzrhewcwzjcfwmlapguyzohy/Build/Products/Debug\"",
+				);
+				PRODUCT_NAME = "unit-tests";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -2362,6 +2473,15 @@
 			buildConfigurations = (
 				70B651580BEA700B002472ED /* Debug */,
 				70B651590BEA700B002472ED /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		DCB57C5317A9E843001CCD72 /* Build configuration list for PBXNativeTarget "unit-tests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DCB57C5417A9E843001CCD72 /* Debug */,
+				DCB57C5517A9E843001CCD72 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
