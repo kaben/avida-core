@@ -22,52 +22,214 @@
 #define cStrand_h
 
 #include "cCPUMemory.h"
-#include "tList.h"
+#include "avida/core/InstructionSequence.h"
+#include "apto/core/Array.h"
+#include "apto/core/String.h"
+#include "apto/core/StringBuffer.h"
+#include "apto/core/Map.h"
 
+class IDBase;
+class ObjBase;
+class cBasicLabelUtils;
+class cFSM;
+class cFSMDB;
+class cFSMDef;
+class cLabel;
+class cLabelHit;
+class cLabelIdx;
+class cSeqIdx;
+class cSequence;
 class cStrand;
-class cStrandLabelPositions;
+template <class T> class ObjIdx;
 
-/*
- A strand is at heart just a string. But we're going to add per-strand label
- tracking. A label is a substring consisting of certain special characters.
- */
-class cStrand : public cCPUMemory {
+Apto::Array<cLabelHit, Apto::Smart> bScanForLabels(const Apto::String&, const cBasicLabelUtils&);
+
+
+class IDBase {
+protected:
+  unsigned int m_obj_ct;
+  unsigned int m_next_new_id;
+  Apto::Array<int> m_recycled_ids;
+protected:
+  IDBase(): m_obj_ct(0), m_next_new_id(0) {}
+  int NextID();
+  void RecycleID(int id);
 public:
-  Apto::Map<int, Apto::Array<int> > m_label_ids_by_position;
-  Apto::Map<int, cStrandLabelPositions > m_label_positions_by_id;
-public:
-  cStrand(const cStrand& in_strand) : cCPUMemory(in_strand) {}
-  cStrand(const cCPUMemory& in_memory) : cCPUMemory(in_memory) {}
-  cStrand(const InstructionSequence& in_genome) : cCPUMemory(in_genome) {}
-  cStrand(const Apto::String& in_string) : cCPUMemory(in_string) {}
-  explicit cStrand(int size = 1) : cCPUMemory(size) {}
-  ~cStrand() { ; }
+  int GetSize() { return m_obj_ct; }
 };
 
-/*
- There can be several copies of each label in a given strand, each copy
- appearing at a different position. For each label ID, the corresponding
- cStrandLabelPositions records the locations of each copy of the label.
- 
- The strand's label index is a hashmap of these cStrandLabelPositions records,
- and is keyed by the distinct label IDs.
- */
-class cStrandLabelPositions {
+
+class ObjBase {
+  template <class T> friend class ObjIdx;
+  friend class cSeqIdx;
+  friend class cLabelIdx;
+private:
+  int m_id;
 public:
-  Apto::Array<int> m_label_positions;
-  /*
-   m_strand_index_node is initially set to NULL. When the owning strand is
-   placed in the main index, backrefs into the index are stored in
-   m_strand_index_node, one backref for each label-ID. The backrefs are
-   recorded so we can quickly find the parts of the index that need updating
-   when we want to remove the strand from the index.
-   */
-  tListNode<cStrand> *m_index_backref;
+  int ID() const { return m_id; }
+};
+
+
+class cBasicLabelUtils {
 public:
-  cStrandLabelPositions(int num_positions = 0)
-  : m_label_positions(num_positions)
-  , m_index_backref(0)
+  char m_zero_char;
+  int m_num_nops;
+  int m_max_label_size;
+public:
+  int GetMaxLabelSize() const { return m_max_label_size; }
+  int GetNumNops() const { return m_num_nops; }
+  int IsNop(char c) const;
+  int Seq2ID(const Apto::String& seq) const;
+  Apto::StringBuffer ID2Seq(const int id) const;
+public:
+  cBasicLabelUtils(
+    const char zero_char = 'a',
+    const int num_nops = 4,
+    const int max_label_size = 3
+  )
+  : m_zero_char(zero_char)
+  , m_num_nops(num_nops)
+  , m_max_label_size(max_label_size)
   {}
 };
+
+
+class cFSM : public ObjBase {
+public:
+  int m_fsm_def_id;
+};
+
+
+class cFSMDef : public ObjBase {
+public:
+  Apto::Map<int, Apto::Set<int> > m_lbl_sites;
+  Apto::Set<int> m_fsm_ids;
+};
+
+
+class cLabel : public ObjBase {
+public:
+  Apto::Set<int> m_seq_ids;
+  Apto::Set<int> m_fsm_def_ids;
+};
+
+
+class cLabelHit {
+public:
+  int m_label_id;
+  int m_pos;
+public:
+  cLabelHit(int label_id = -1, int pos = -1): m_label_id(label_id), m_pos(pos) {}
+public:
+  int Lbl() const { return m_label_id; }
+  int Pos() const { return m_pos; }
+  bool operator==(const cLabelHit & other) const { return (other.m_label_id == m_label_id) && (other.m_pos == m_pos); }
+  bool operator!=(const cLabelHit & other) const { return (other.m_label_id != m_label_id) || (other.m_pos != m_pos); }
+};
+
+
+class cLabelIdx {
+protected:
+  Apto::Map<int, cLabel> m_id2obj;
+public:
+  typedef typename Apto::Map<int, cLabel> AM;
+  typedef typename AM::KeyIterator IDIter;
+  typedef typename AM::ValueIterator ObjIter;
+public:
+  bool Has(int id);
+  cLabel* Get(int id);
+  int GetSize();
+  cLabel* Insert(int id);
+  bool Delete(int id);
+  IDIter IDs();
+  ObjIter Objs();
+};
+
+
+class cSeqIdx : public IDBase {
+protected:
+  Apto::Map<int, cSequence> m_id2obj;
+  Apto::Map<Apto::String, int> m_str2id;
+  Apto::Map<int, Apto::String> m_id2str;
+public:
+  typedef typename Apto::Map<int, cSequence> AM;
+  typedef typename AM::KeyIterator IDIter;
+  typedef typename AM::ValueIterator ObjIter;
+public:
+  bool Has(int id);
+  bool Has(const Apto::String &str);
+  cSequence* Get(int id);
+  int GetID(const Apto::String &str);
+  Apto::String GetString(int id);
+  cSequence* Insert(const Apto::String &str);
+  bool Delete(int id);
+  bool Delete(const Apto::String &str);
+  IDIter IDs();
+  ObjIter Objs();
+};
+
+
+class cSequence : public ObjBase {
+public:
+  Apto::Map<int, Apto::Set<int> > m_lbl_sites;
+  Apto::Set<int> m_strand_ids;
+};
+
+
+class cStrand : public ObjBase {
+public:
+  int m_seq_id;
+};
+
+
+template <class T>
+class ObjIdx : public IDBase {
+protected:
+  Apto::Map<int, T> m_id2obj;
+public:
+  typedef typename Apto::Map<int, T> AM;
+  typedef typename AM::KeyIterator IDIter;
+  typedef typename AM::ValueIterator ObjIter;
+public:
+  bool Has(int id) { return m_id2obj.Has(id); }
+  T* Get(int id) { return (Has(id))?(&m_id2obj.Get(id)):(0); }
+  T* Create() {
+    int id = NextID();
+    T* ptr = &m_id2obj.Get(id);
+    ptr->m_id = id;
+    return ptr;
+  }
+  bool Delete(int id) {
+    if (Has(id)) {
+      m_id2obj.Remove(id);
+      RecycleID(id);
+      return true;
+    }
+    return false;
+  }
+  IDIter IDs() { return m_id2obj.Keys(); }
+  ObjIter Objs() { return m_id2obj.Values(); }
+};
+
+
+class cFSMDB {
+public:
+  cLabelIdx m_lbls;
+  cSeqIdx m_seqs;
+  ObjIdx<cStrand> m_strands;
+  ObjIdx<cFSMDef> m_fsm_defs;
+  ObjIdx<cFSM> m_fsms;
+
+  cBasicLabelUtils m_label_utils;
+
+  int CreateStrand(const Apto::String &sequence);
+  bool RemoveStrand(int strand_id);
+protected:
+  void LinkSeqLblPos(int seq_id, int lbl_id, int lbl_pos);
+  int InsertSequence(const Apto::String &sequence);
+  void UnlinkSeqLbls(int seq_id);
+  bool RemoveSequence(int seq_id);
+};
+
 
 #endif

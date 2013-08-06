@@ -1388,6 +1388,7 @@
 			isa = PBXGroup;
 			children = (
 				70FEF6231381B04500A9D082 /* libapto.a */,
+				DC68694417A9EE530015907A /* libgtest.a */,
 				70658C59085DF67D00486BED /* libncurses.5.4.dylib */,
 				704C629C160CA6CC004E9B25 /* libtcmalloc-1.4.a */,
 			);
@@ -1576,7 +1577,6 @@
 		DCC30C490762532C008F7A48 = {
 			isa = PBXGroup;
 			children = (
-				DC68694417A9EE530015907A /* libgtest.a */,
 				703549221333E30800D3865C /* include */,
 				DCC30C670762539A008F7A48 /* source */,
 				70F962BD135AA2E7008EDD1C /* unittests */,
