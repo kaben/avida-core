@@ -2,7 +2,7 @@
  *  unittests/core/Strand.cc
  *  avida-core
  *
- *  Created by Kaben on 7/31/13.
+ *  File created by Kaben Nanlohy on 7/31/13.
  *  Copyright 2013 Michigan State University. All rights reserved.
  *  http://avida.devosoft.org/
  *
@@ -24,11 +24,24 @@
 
 #include "cpu/cStrand.h"
 
+#include "apto/scheduler/Util.h"
+
 #include "gtest/gtest.h"
 
 #include <iostream>
+#include <algorithm>    // std::random_shuffle
+#include <vector>       // std::vector
+#include <cmath>        // double pow (double base, double exponent);
+#include <cstdlib>      // std::rand, std::srand
 
 using namespace std;
+
+
+/*
+BOOKMARK 20130818-2146
+Next steps:
+- Resume work on collisions.
+*/
 
 
 //class cFSMdb;
@@ -52,12 +65,12 @@ using namespace std;
 //class cFSMProgramStrandBootstrap;
 //class cFSMProgramStrandEncoding;
 //
-//class cLabelHit;
+//class cHit;
 //class bBindingLibrary;
 //class bBinding;
 //class bBindingCriteria;
 //
-//Apto::Array<cLabelHit, Apto::Smart> bScanForLabels(int seq_id, cFSMdb &db);
+//Apto::Array<cHit, Apto::Smart> bScanForLabels(int seq_id, cFSMdb &db);
 //
 //class cSequence {
 //public:
@@ -98,7 +111,7 @@ using namespace std;
 //  bool RemoveFSMDef(int fsm_def_id) { m_fsm_def_ids.Remove(fsm_def_id); }
 //};
 //
-//class cLabelIdx {
+//class cLabelDeletemeIdx {
 //protected:
 //  Apto::Map<int, cLabel> m_id2obj;
 //public:
@@ -153,11 +166,11 @@ using namespace std;
 //public:
 //  bool Has(int id) { return m_id2obj.Has(id); }
 //  bool Has(const Apto::String &str) { return m_str2id.Has(str); }
-//  cSequence* Get(int id) { return (Has(id))?(&m_id2obj.Get(id)):(0); }
+//  Apto::SmartPtr<cSequence> Get(int id) { return (Has(id))?(&m_id2obj.Get(id)):(0); }
 //  int GetID(const Apto::String &str) { return (Has(str))?(m_str2id.Get(str)):(-1); }
 //  Apto::String GetString(int id) {
 //    /* Indicate if id isn't in the index by returning m_no_such_str. */
-//    cSequence* ptr = Get(id);
+//    Apto::SmartPtr<cSequence> ptr = Get(id);
 //    if (ptr) { return ptr->GetString(); }
 //    return m_nil;
 //  }
@@ -166,7 +179,7 @@ using namespace std;
 //    int id = GetID(str);
 //    if (id < 0) {
 //      id = NextID();
-//      cSequence* ptr = &m_id2obj.Get(id);
+//      Apto::SmartPtr<cSequence> ptr = &m_id2obj.Get(id);
 //      m_str2id[str] = id;
 //
 //      ptr->m_str = str;
@@ -185,7 +198,7 @@ using namespace std;
 //    return id;
 //  }
 //  bool Delete(int id) {
-//    cSequence* ptr = Get(id);
+//    Apto::SmartPtr<cSequence> ptr = Get(id);
 //    if (ptr) {
 //      m_str2id.Remove(ptr->m_str);
 //      m_id2obj.Remove(id);
@@ -231,8 +244,8 @@ cFSMdb owns all objects, and each object has an ID.
 //class cFSMdb {
 //public:
 //  bSeqIDIdx m_seq_idx;
-//  ObjIdx<cStrand> m_strand_idx;
-//  cLabelIdx m_label_idx;
+//  ObjDeleteMeIdx<cStrand> m_strand_idx;
+//  cLabelDeletemeIdx m_label_idx;
 //
 //  cBasicLabelUtils m_label_utils;
 //public:
@@ -241,13 +254,13 @@ cFSMdb owns all objects, and each object has an ID.
 //  int InsertSequence(const Apto::String& sequence); 
 //  Apto::String GetSequenceString(int id);
 //  bool HasSequence(int id);
-//  bool HasSequence(cSequence* ptr);
+//  bool HasSequence(Apto::SmartPtr<cSequence> &ptr);
 //  bool HasSequence(const Apto::String &str);
 //  cSequence *GetSequence(int id); 
 //  int GetSequenceID(cSequence *ptr); 
 //  int GetSequenceID(const Apto::String &str); 
 //  bool RemoveSequence(const Apto::String& sequence);
-//  bool RemoveSequence(cSequence* ptr);
+//  bool RemoveSequence(Apto::SmartPtr<cSequence> &ptr);
 //  bool RemoveSequence(int id);
 //
 //  cLabel* InsertLabel(int id); 
@@ -277,7 +290,7 @@ cFSMdb owns all objects, and each object has an ID.
 //  } else {
 //    /* Scan new sequence for labels. */
 //    seq_id = m_seq_idx.Insert(seq);
-//    Apto::Array<cLabelHit, Apto::Smart> hits(bScanForLabels(seq_id, *this));
+//    Apto::Array<cHit, Apto::Smart> hits(bScanForLabels(seq_id, *this));
 //    for (int i=0; i<hits.GetSize(); i++) {
 //      LinkSeqLblPos(seq_id, hits[i].Lbl(), hits[i].Pos());
 //    }
@@ -286,11 +299,11 @@ cFSMdb owns all objects, and each object has an ID.
 //}
 //
 //bool cFSMdb::HasSequence(int id) { return m_seq_idx.Has(id); }
-//bool cFSMdb::HasSequence(cSequence* ptr) { return m_seq_idx.Has(ptr); }
+//bool cFSMdb::HasSequence(Apto::SmartPtr<cSequence> ptr) { return m_seq_idx.Has(ptr); }
 //bool cFSMdb::HasSequence(const Apto::String &str) { return m_seq_idx.Has(str); }
 //
 //void cFSMdb::UnlinkSeqLblPos(int seq_id, int lbl_id, int lbl_pos) {
-//  cSequence* seq_ptr = GetSequence(seq_id);
+//  Apto::SmartPtr<cSequence> seq_ptr = GetSequence(seq_id);
 //  if (seq_ptr) {
 //    seq_ptr->RemoveLabelPos(lbl_id, lbl_pos);
 //    if (seq_ptr->GetLabelHitCt(lbl_id) <= 0) {
@@ -304,7 +317,7 @@ cFSMdb owns all objects, and each object has an ID.
 //  }
 //}
 //void cFSMdb::UnlinkSeqLbl(int seq_id, int lbl_id) {
-//  cSequence* seq_ptr = GetSequence(seq_id);
+//  Apto::SmartPtr<cSequence> seq_ptr = GetSequence(seq_id);
 //  cLabel* lbl_ptr = GetLabel(lbl_id);
 //  if (seq_ptr && lbl_ptr) {
 //    lbl_ptr->RemoveSeq(seq_id);
@@ -313,7 +326,7 @@ cFSMdb owns all objects, and each object has an ID.
 //  }
 //}
 //void cFSMdb::UnlinkSeqLbls(int seq_id) {
-//  cSequence* seq_ptr = GetSequence(seq_id);
+//  Apto::SmartPtr<cSequence> seq_ptr = GetSequence(seq_id);
 //  if (seq_ptr) {
 //    for (cSequence::LabelIter it = seq_ptr->Labels(); it.Next();) {
 //      int lbl_id = *it.Get();
@@ -330,13 +343,13 @@ cFSMdb owns all objects, and each object has an ID.
 //}
 //
 //Apto::String cFSMdb::GetSequenceString(int id) { return m_seq_idx.GetString(id); }
-//cSequence* cFSMdb::GetSequence(int id) { return m_seq_idx.Get(id); }
+//Apto::SmartPtr<cSequence> cFSMdb::GetSequence(int id) { return m_seq_idx.Get(id); }
 //int cFSMdb::GetSequenceID(cSequence *ptr) { return m_seq_idx.GetID(ptr); }
 //int cFSMdb::GetSequenceID(const Apto::String &str) { return m_seq_idx.GetID(str); }
 //bool cFSMdb::RemoveSequence(const Apto::String& str) {
 //  RemoveSequence(GetSequenceID(str));
 //}
-//bool cFSMdb::RemoveSequence(cSequence* ptr) {
+//bool cFSMdb::RemoveSequence(Apto::SmartPtr<cSequence> ptr) {
 //  RemoveSequence(GetSequenceID(ptr));
 //}
 //bool cFSMdb::RemoveSequence(int id) {
@@ -395,201 +408,6 @@ cFSMdb owns all objects, and each object has an ID.
 
 
 
-
-
-namespace nObjIdxTests {
-
-  class AnObjectClass : public ObjBase {
-  public:
-    int m_an_instance_variable;
-  public:
-    /* Must have public default constructor. */
-    AnObjectClass(): m_an_instance_variable(0) {}
-  };
-  
-  TEST(ObjIdx, instantiation){
-    ObjIdx<AnObjectClass> idx;
-    /* Simple check to make sure instantiation works. */
-    /* Call a method to ensure instantiation of template class. */
-    /* Index should initially be empty, so have zero size! */
-    EXPECT_EQ(0, idx.GetSize());
-  }
-  
-  TEST(ObjIdx, handle_get_nonsense){
-    ObjIdx<AnObjectClass> idx;
-    EXPECT_EQ(0, idx.GetSize());
-    /* Try to get using a nonsense ID; should return null ptr. */
-    EXPECT_EQ(0, idx.Get(-1));
-    /* Try to get using a bad ID; should return null ptr. */
-    EXPECT_EQ(0, idx.Get(0));
-    /* Get with bad ptr should not accidentally add to index! */
-    EXPECT_EQ(0, idx.GetSize());
-  }
-  
-  TEST(ObjIdx, create){
-    ObjIdx<AnObjectClass> idx;
-    /* Create should return non-null ptr. */
-    AnObjectClass *ptr = idx.Create();
-    EXPECT_NE((AnObjectClass *)0, ptr);
-    /* Initial object should have ID zero! */
-    EXPECT_EQ(0, ptr->ID());
-  }
-  
-  TEST(ObjIdx, persistence){
-    ObjIdx<AnObjectClass> idx;
-    /* Changes to a managed object should persist. */
-    int id = -1;
-    {
-      AnObjectClass *ptr_0 = idx.Create();
-      /* Initial value of instance variable should be zero. */
-      EXPECT_EQ(0, ptr_0->m_an_instance_variable);
-      ptr_0->m_an_instance_variable = 5;
-      id = ptr_0->ID();
-    }
-    {
-      AnObjectClass *ptr_1 = idx.Get(id);
-      /* After value of instance variable was changed to 5, and object reaccessed, value should still be 5. */
-      EXPECT_EQ(5, ptr_1->m_an_instance_variable);
-    }
-  }
-  
-  TEST(ObjIdx, delete_by_id){
-    ObjIdx<AnObjectClass> idx;
-    /* Initial index size should be zero. */
-    EXPECT_EQ(0, idx.GetSize());
-    /* Delete by nonsense ID should fail. */
-    EXPECT_FALSE(idx.Delete(-1));
-    /* Delete by bad ID should fail. */
-    EXPECT_FALSE(idx.Delete(0));
-    /* Index size should still be zero. */
-    EXPECT_EQ(0, idx.GetSize());
-    /* Zero should be ID of first object. */
-    EXPECT_EQ(0, idx.Create()->ID());
-    /* Index size should now be one. */
-    EXPECT_EQ(1, idx.GetSize());
-    /* First delete by ID 0 should succeed. */
-    EXPECT_TRUE(idx.Delete(0));
-    /* After delete of sole object, index size should be zero again. */
-    EXPECT_EQ(0, idx.GetSize());
-    /* Second delete by ID 0 should fail, since object was already deleted. */
-    EXPECT_FALSE(idx.Delete(0));
-    /* Index size should still be zero. */
-    EXPECT_EQ(0, idx.GetSize());
-  }
-  
-  TEST(ObjIdx, recycled_ids){
-    ObjIdx<AnObjectClass> idx;
-    /* Create and verify three objects in index. */
-    EXPECT_EQ(0, idx.Create()->ID());
-    EXPECT_EQ(1, idx.Create()->ID());
-    EXPECT_EQ(2, idx.Create()->ID());
-    EXPECT_EQ(3, idx.GetSize());
-    /* Verify persistence of instance variable in second object. */
-    EXPECT_EQ(0, idx.Get(1)->m_an_instance_variable);
-    idx.Get(1)->m_an_instance_variable = 5;
-    EXPECT_EQ(5, idx.Get(1)->m_an_instance_variable);
-    /* Delete and verify one object from index. */
-    EXPECT_TRUE(idx.Delete(1));
-    EXPECT_EQ(2, idx.GetSize());
-    EXPECT_FALSE(idx.Delete(1));
-    EXPECT_EQ(2, idx.GetSize());
-    /* Create new object; second ID should be recycled. New instance variable should be default. */
-    EXPECT_EQ(1, idx.Create()->ID());
-    EXPECT_EQ(0, idx.Get(1)->m_an_instance_variable);
-    EXPECT_EQ(3, idx.GetSize());
-    /* Next object makes four in index, and should have fourth ID. */
-    EXPECT_EQ(3, idx.Create()->ID());
-    EXPECT_EQ(4, idx.GetSize());
-  }
-  
-  TEST(ObjIdx, id_iterator){
-    ObjIdx<AnObjectClass> idx;
-    int i = 0;
-    /* Create and verify three objects in index. */
-    EXPECT_EQ(0, idx.Create()->ID());
-    EXPECT_EQ(1, idx.Create()->ID());
-    EXPECT_EQ(2, idx.Create()->ID());
-    EXPECT_EQ(3, idx.GetSize());
-    /* Should iterate over three IDs. */
-    i = 0;
-    for (ObjIdx<AnObjectClass>::IDIter it = idx.IDs(); it.Next(); ){
-      i+=1;
-      EXPECT_LE(0, *it.Get());
-      EXPECT_GE(2, *it.Get());
-    }
-    EXPECT_EQ(3, i);
-    /* Delete and verify one object from index. */
-    EXPECT_TRUE(idx.Delete(1));
-    EXPECT_EQ(2, idx.GetSize());
-    EXPECT_FALSE(idx.Delete(1));
-    EXPECT_EQ(2, idx.GetSize());
-    /* Should iterate over two IDs. */
-    i = 0;
-    for (ObjIdx<AnObjectClass>::IDIter it = idx.IDs(); it.Next(); ){
-      i+=1;
-      EXPECT_LE(0, *it.Get());
-      EXPECT_NE(1, *it.Get());
-      EXPECT_GE(2, *it.Get());
-    }
-    EXPECT_EQ(2, i);
-    /* Regression: Get with bad ID should not accidentally add to index! */
-    /* Should iterate over two IDs. */
-    EXPECT_EQ(0, idx.Get(-1));
-    EXPECT_EQ(2, idx.GetSize());
-    EXPECT_EQ(0, idx.Get(1));
-    EXPECT_EQ(2, idx.GetSize());
-    i = 0;
-    for (ObjIdx<AnObjectClass>::IDIter it = idx.IDs(); it.Next(); ){
-      i+=1;
-      EXPECT_LE(0, *it.Get());
-      EXPECT_NE(1, *it.Get());
-      EXPECT_GE(2, *it.Get());
-    }
-    EXPECT_EQ(2, i);
-  }
-  
-  TEST(ObjIdx, obj_iterator){
-    ObjIdx<AnObjectClass> idx;
-    int i = 0;
-    /* Create and verify three objects in index. */
-    EXPECT_EQ(0, idx.Create()->ID());
-    EXPECT_EQ(1, idx.Create()->ID());
-    EXPECT_EQ(2, idx.Create()->ID());
-    EXPECT_EQ(3, idx.GetSize());
-    /* Should iterate over three objects. */
-    i = 0;
-    for (ObjIdx<AnObjectClass>::ObjIter it = idx.Objs(); it.Next(); ){
-      i+=1;
-      EXPECT_NE((AnObjectClass*)0, it.Get());
-    }
-    EXPECT_EQ(3, i);
-    /* Delete and verify one object from index. */
-    EXPECT_TRUE(idx.Delete(1));
-    EXPECT_EQ(2, idx.GetSize());
-    EXPECT_FALSE(idx.Delete(1));
-    EXPECT_EQ(2, idx.GetSize());
-    /* Should iterate over two objects. */
-    i = 0;
-    for (ObjIdx<AnObjectClass>::ObjIter it = idx.Objs(); it.Next(); ){
-      i+=1;
-      EXPECT_NE((AnObjectClass*)0, it.Get());
-    }
-    EXPECT_EQ(2, i);
-    /* Regression: Get with bad ID should not accidentally add to index! */
-    /* Should iterate over two objects. */
-    EXPECT_EQ(0, idx.Get(-1));
-    EXPECT_EQ(2, idx.GetSize());
-    EXPECT_EQ(0, idx.Get(1));
-    EXPECT_EQ(2, idx.GetSize());
-    i = 0;
-    for (ObjIdx<AnObjectClass>::ObjIter it = idx.Objs(); it.Next(); ){
-      i+=1;
-      EXPECT_NE((AnObjectClass*)0, it.Get());
-    }
-    EXPECT_EQ(2, i);
-  }
-}
-
 TEST(cSeqIdx, brainstorm){
   cSeqIdx idx;
 
@@ -642,19 +460,19 @@ namespace cLabelIdxTests {
   TEST(cLabelIdx, handle_get_nonsense){
     cLabelIdx idx;
     /* Try to get using a nonsense ID; should return null ptr. */
-    EXPECT_EQ(0, idx.Get(-1));
+    EXPECT_FALSE(idx.Get(-1));
     /* Try to get using a bad ID; should return null ptr. */
-    EXPECT_EQ(0, idx.Get(0));
+    EXPECT_FALSE(idx.Get(0));
     /* Get with bad ID should not accidentally add to index! */
-    EXPECT_EQ(0, idx.Get(0));
+    EXPECT_FALSE(idx.Get(0));
     EXPECT_EQ(0, idx.GetSize());
   }
 
   TEST(cLabelIdx, insert){
     cLabelIdx idx;
     /* Create should return non-null ptr. */
-    cLabel *ptr = idx.Insert(5);
-    EXPECT_NE((cLabel *)0, idx.Insert(5));
+    cLabel* ptr = idx.Insert(5);
+    EXPECT_TRUE(idx.Insert(5));
     /* Object should have ID 5! */
     EXPECT_EQ(5, ptr->ID());
     EXPECT_EQ(1, idx.GetSize());
@@ -665,7 +483,7 @@ namespace cLabelIdxTests {
     /* Changes to a managed object should persist. */
     int id = -1;
     {
-      cLabel *ptr_0 = idx.Insert(5);
+      cLabel* ptr_0 = idx.Insert(5);
       EXPECT_EQ(0, ptr_0->m_seq_ids.GetSize());
       EXPECT_FALSE(ptr_0->m_seq_ids.Has(7));
       ptr_0->m_seq_ids.Insert(7);
@@ -674,7 +492,7 @@ namespace cLabelIdxTests {
       id = ptr_0->ID();
     }
     {
-      cLabel *ptr_1 = idx.Get(id);
+      cLabel* ptr_1 = idx.Get(id);
       EXPECT_EQ(1, ptr_1->m_seq_ids.GetSize());
       EXPECT_TRUE(ptr_1->m_seq_ids.Has(7));
     }
@@ -704,7 +522,7 @@ namespace cLabelIdxTests {
     EXPECT_EQ(0, idx.GetSize());
   }
 
-  TEST(cLabelIdx, id_iterator){
+  TEST(cLabelIdx, iterator){
     cLabelIdx idx;
     int i = 0;
     /* Create and verify three objects in index. */
@@ -714,10 +532,11 @@ namespace cLabelIdxTests {
     EXPECT_EQ(3, idx.GetSize());
     /* Should iterate over three IDs. */
     i = 0;
-    for (cLabelIdx::IDIter it = idx.IDs(); it.Next(); ){
+    for (cLabelIdx::Iterator it = idx.Begin(); it.Next(); ){
       i+=1;
-      EXPECT_LE(2, *it.Get());
-      EXPECT_GE(5, *it.Get());
+      EXPECT_TRUE(it.Get());
+      EXPECT_LE(2, it.ID());
+      EXPECT_GE(5, it.ID());
     }
     EXPECT_EQ(3, i);
     /* Delete and verify one object from index. */
@@ -727,70 +546,29 @@ namespace cLabelIdxTests {
     EXPECT_EQ(2, idx.GetSize());
     /* Should iterate over two IDs. */
     i = 0;
-    for (cLabelIdx::IDIter it = idx.IDs(); it.Next(); ){
+    for (cLabelIdx::Iterator it = idx.Begin(); it.Next(); ){
       i+=1;
-      EXPECT_LE(2, *it.Get());
-      EXPECT_NE(3, *it.Get());
-      EXPECT_GE(5, *it.Get());
+      EXPECT_TRUE(it.Get());
+      EXPECT_LE(2, it.ID());
+      EXPECT_NE(3, it.ID());
+      EXPECT_GE(5, it.ID());
     }
     EXPECT_EQ(2, i);
     /* Regression: Get with bad ID should not accidentally add to index! */
     /* Should iterate over two IDs. */
-    EXPECT_EQ(0, idx.Get(-1));
+    EXPECT_FALSE(idx.Get(-1));
     EXPECT_EQ(2, idx.GetSize());
-    EXPECT_EQ(0, idx.Get(1));
+    EXPECT_FALSE(idx.Get(1));
     EXPECT_EQ(2, idx.GetSize());
-    EXPECT_EQ(0, idx.Get(3));
-    EXPECT_EQ(2, idx.GetSize());
-    i = 0;
-    for (cLabelIdx::IDIter it = idx.IDs(); it.Next(); ){
-      i+=1;
-      EXPECT_LE(2, *it.Get());
-      EXPECT_NE(3, *it.Get());
-      EXPECT_GE(5, *it.Get());
-    }
-    EXPECT_EQ(2, i);
-  }
-
-  TEST(cLabelIdx, obj_iterator){
-    cLabelIdx idx;
-    int i = 0;
-    /* Create and verify three objects in index. */
-    EXPECT_EQ(2, idx.Insert(2)->ID());
-    EXPECT_EQ(3, idx.Insert(3)->ID());
-    EXPECT_EQ(5, idx.Insert(5)->ID());
-    EXPECT_EQ(3, idx.GetSize());
-    /* Should iterate over three objects. */
-    i = 0;
-    for (cLabelIdx::ObjIter it = idx.Objs(); it.Next(); ){
-      i+=1;
-      EXPECT_NE((cLabel*)0, it.Get());
-    }
-    EXPECT_EQ(3, i);
-    /* Delete and verify one object from index. */
-    EXPECT_TRUE(idx.Delete(3));
-    EXPECT_EQ(2, idx.GetSize());
-    EXPECT_FALSE(idx.Delete(3));
-    EXPECT_EQ(2, idx.GetSize());
-    /* Should iterate over two objects. */
-    i = 0;
-    for (cLabelIdx::ObjIter it = idx.Objs(); it.Next(); ){
-      i+=1;
-      EXPECT_NE((cLabel*)0, it.Get());
-    }
-    EXPECT_EQ(2, i);
-    /* Regression: Get with bad ID should not accidentally add to index! */
-    /* Should iterate over two objects. */
-    EXPECT_EQ(0, idx.Get(-1));
-    EXPECT_EQ(2, idx.GetSize());
-    EXPECT_EQ(0, idx.Get(1));
-    EXPECT_EQ(2, idx.GetSize());
-    EXPECT_EQ(0, idx.Get(3));
+    EXPECT_FALSE(idx.Get(3));
     EXPECT_EQ(2, idx.GetSize());
     i = 0;
-    for (cLabelIdx::ObjIter it = idx.Objs(); it.Next(); ){
+    for (cLabelIdx::Iterator it = idx.Begin(); it.Next(); ){
       i+=1;
-      EXPECT_NE((cLabel*)0, it.Get());
+      EXPECT_TRUE(it.Get());
+      EXPECT_LE(2, it.ID());
+      EXPECT_NE(3, it.ID());
+      EXPECT_GE(5, it.ID());
     }
     EXPECT_EQ(2, i);
   }
@@ -801,7 +579,6 @@ namespace nFSMDBTests {
 
   class cFSMDBTestFixture : public cFSMDB {
   public:
-    void LinkSeqLblPos(int seq_id, int lbl_id, int lbl_pos) { cFSMDB::LinkSeqLblPos(seq_id, lbl_id, lbl_pos); }
     int InsertSequence(const Apto::String &sequence) { return cFSMDB::InsertSequence(sequence); }
     void UnlinkSeqLbls(int seq_id) { cFSMDB::UnlinkSeqLbls(seq_id); }
     bool RemoveSequence(int seq_id) { return cFSMDB::RemoveSequence(seq_id); }
@@ -855,24 +632,24 @@ namespace nFSMDBTests {
 //  
 //    //EXPECT_FALSE(db.HasSequence(-1));
 //    //EXPECT_FALSE(db.HasSequence(0));
-//    //EXPECT_FALSE(db.HasSequence((cSequence*)0));
+//    //EXPECT_FALSE(db.HasSequence(Apto::SmartPtr<cSequence>());
 //    //EXPECT_FALSE(db.HasSequence(seq));
 //  
 //    //EXPECT_EQ("", db.GetSequenceString(-1));
 //    //EXPECT_EQ("", db.GetSequenceString(0));
-//    //EXPECT_EQ("", db.GetSequenceString((cSequence*)0));
+//    //EXPECT_EQ("", db.GetSequenceString(Apto::SmartPtr<cSequence>()));
 //    //EXPECT_EQ((cLabel*)0, db.GetSequence(-1));
 //    //EXPECT_EQ((cLabel*)0, db.GetSequence(0));
-//    //EXPECT_EQ(-1, db.GetSequenceID((cSequence*)0));
+//    //EXPECT_EQ(-1, db.GetSequenceID(Apto::SmartPtr<cSequence>());
 //    //EXPECT_EQ(-1, db.GetSequenceID(seq);
 //  
 //    //EXPECT_EQ(-1, db.SequenceRefCt(-1));
 //    //EXPECT_EQ(-1, db.SequenceRefCt(0));
-//    //EXPECT_EQ(-1, db.SequenceRefCt((cSequence*)0));
+//    //EXPECT_EQ(-1, db.SequenceRefCt(Apto::SmartPtr<cSequence>());
 //    //EXPECT_EQ(-1, db.SequenceRefCt(seq));
 //  
 //    //int id = db.InsertSequence(seq);
-//    //cSequence* ptr = db.GetSequence(id);
+//    //Apto::SmartPtr<cSequence> ptr = db.GetSequence(id);
 //  
 //    //EXPECT_TRUE(db.HasSequence(id));
 //    //EXPECT_TRUE(db.HasSequence(ptr));
@@ -993,6 +770,7 @@ namespace nFSMDBTests {
 //  }
 
 
+
   TEST(cFSMDB, brainstorm_0){
     cFSMDBTestFixture db;
     /* Create first seq. */
@@ -1009,7 +787,7 @@ namespace nFSMDBTests {
     EXPECT_TRUE(db.m_seqs.Has(seq_0));
     cSequence* seq_ptr_0 = db.m_seqs.Get(seq_id_0);
     /* Sanity: make sure seq_ptr_0 is valid. */
-    EXPECT_NE((cSequence*)0, seq_ptr_0);
+    EXPECT_TRUE(seq_ptr_0);
     /*
     Adding the sequence a second time should not result in reindexing, which is
     reflected in the verification below of label info.
@@ -1020,15 +798,19 @@ namespace nFSMDBTests {
     EXPECT_EQ(9, seq_ptr_0->m_lbl_sites.GetSize());
     int lbl_id = -1;
     int lbl_pos = -1;
-    cLabel* lbl_ptr = 0;
-    Apto::Map<int, Apto::Set<int> >::KeyIterator lbl_it = seq_ptr_0->m_lbl_sites.Keys();  
+    //Apto::SmartPtr<cLabel> lbl_ptr;
+    cLabel* lbl_ptr;
+    //Apto::Map<int, Apto::Set<int> >::KeyIterator lbl_it = seq_ptr_0->m_lbl_sites.Keys();  
+    Apto::Map<int, Apto::Array<int> >::KeyIterator lbl_it = seq_ptr_0->m_lbl_sites.Keys();  
   
     lbl_it.Next(); lbl_id = *lbl_it.Get(); lbl_ptr = db.m_lbls.Get(lbl_id); 
     EXPECT_EQ(db.m_label_utils.Seq2ID("a"), lbl_id);
     EXPECT_EQ(3, seq_ptr_0->m_lbl_sites[lbl_id].GetSize());
     EXPECT_EQ(1, lbl_ptr->m_seq_ids.GetSize());
     EXPECT_TRUE(lbl_ptr->m_seq_ids.Has(seq_id_0));
-    Apto::Set<int>::Iterator pos_it = seq_ptr_0->m_lbl_sites[lbl_id].Begin(); {
+    //Apto::Set<int>::Iterator pos_it = seq_ptr_0->m_lbl_sites[lbl_id].Begin(); {
+    {
+      Apto::Array<int>::Iterator pos_it = seq_ptr_0->m_lbl_sites[lbl_id].Begin();
       pos_it.Next(); EXPECT_EQ(0, *pos_it.Get());
       pos_it.Next(); EXPECT_EQ(7, *pos_it.Get());
       pos_it.Next(); EXPECT_EQ(14, *pos_it.Get());
@@ -1038,7 +820,8 @@ namespace nFSMDBTests {
     EXPECT_EQ(3, seq_ptr_0->m_lbl_sites[lbl_id].GetSize());
     EXPECT_EQ(1, lbl_ptr->m_seq_ids.GetSize());
     EXPECT_TRUE(lbl_ptr->m_seq_ids.Has(seq_id_0));
-    pos_it = seq_ptr_0->m_lbl_sites[lbl_id].Begin(); {
+    {
+      Apto::Array<int>::Iterator pos_it = seq_ptr_0->m_lbl_sites[lbl_id].Begin();
       pos_it.Next(); EXPECT_EQ(1, *pos_it.Get());
       pos_it.Next(); EXPECT_EQ(8, *pos_it.Get());
       pos_it.Next(); EXPECT_EQ(15, *pos_it.Get());
@@ -1048,7 +831,8 @@ namespace nFSMDBTests {
     EXPECT_EQ(3, seq_ptr_0->m_lbl_sites[lbl_id].GetSize());
     EXPECT_EQ(1, lbl_ptr->m_seq_ids.GetSize());
     EXPECT_TRUE(lbl_ptr->m_seq_ids.Has(seq_id_0));
-    pos_it = seq_ptr_0->m_lbl_sites[lbl_id].Begin(); {
+    {
+      Apto::Array<int>::Iterator pos_it = seq_ptr_0->m_lbl_sites[lbl_id].Begin();
       pos_it.Next(); EXPECT_EQ(1, *pos_it.Get());
       pos_it.Next(); EXPECT_EQ(8, *pos_it.Get());
       pos_it.Next(); EXPECT_EQ(15, *pos_it.Get());
@@ -1058,7 +842,8 @@ namespace nFSMDBTests {
     EXPECT_EQ(3, seq_ptr_0->m_lbl_sites[lbl_id].GetSize());
     EXPECT_EQ(1, lbl_ptr->m_seq_ids.GetSize());
     EXPECT_TRUE(lbl_ptr->m_seq_ids.Has(seq_id_0));
-    pos_it = seq_ptr_0->m_lbl_sites[lbl_id].Begin(); {
+    {
+      Apto::Array<int>::Iterator pos_it = seq_ptr_0->m_lbl_sites[lbl_id].Begin();
       pos_it.Next(); EXPECT_EQ(2, *pos_it.Get());
       pos_it.Next(); EXPECT_EQ(9, *pos_it.Get());
       pos_it.Next(); EXPECT_EQ(16, *pos_it.Get());
@@ -1068,7 +853,8 @@ namespace nFSMDBTests {
     EXPECT_EQ(3, seq_ptr_0->m_lbl_sites[lbl_id].GetSize());
     EXPECT_EQ(1, lbl_ptr->m_seq_ids.GetSize());
     EXPECT_TRUE(lbl_ptr->m_seq_ids.Has(seq_id_0));
-    pos_it = seq_ptr_0->m_lbl_sites[lbl_id].Begin(); {
+    {
+      Apto::Array<int>::Iterator pos_it = seq_ptr_0->m_lbl_sites[lbl_id].Begin();
       pos_it.Next(); EXPECT_EQ(0, *pos_it.Get());
       pos_it.Next(); EXPECT_EQ(7, *pos_it.Get());
       pos_it.Next(); EXPECT_EQ(14, *pos_it.Get());
@@ -1078,7 +864,8 @@ namespace nFSMDBTests {
     EXPECT_EQ(3, seq_ptr_0->m_lbl_sites[lbl_id].GetSize());
     EXPECT_EQ(1, lbl_ptr->m_seq_ids.GetSize());
     EXPECT_TRUE(lbl_ptr->m_seq_ids.Has(seq_id_0));
-    pos_it = seq_ptr_0->m_lbl_sites[lbl_id].Begin(); {
+    {
+      Apto::Array<int>::Iterator pos_it = seq_ptr_0->m_lbl_sites[lbl_id].Begin();
       pos_it.Next(); EXPECT_EQ(3, *pos_it.Get());
       pos_it.Next(); EXPECT_EQ(10, *pos_it.Get());
       pos_it.Next(); EXPECT_EQ(17, *pos_it.Get());
@@ -1088,7 +875,8 @@ namespace nFSMDBTests {
     EXPECT_EQ(3, seq_ptr_0->m_lbl_sites[lbl_id].GetSize());
     EXPECT_EQ(1, lbl_ptr->m_seq_ids.GetSize());
     EXPECT_TRUE(lbl_ptr->m_seq_ids.Has(seq_id_0));
-    pos_it = seq_ptr_0->m_lbl_sites[lbl_id].Begin(); {
+    {
+      Apto::Array<int>::Iterator pos_it = seq_ptr_0->m_lbl_sites[lbl_id].Begin();
       pos_it.Next(); EXPECT_EQ(0, *pos_it.Get());
       pos_it.Next(); EXPECT_EQ(7, *pos_it.Get());
       pos_it.Next(); EXPECT_EQ(14, *pos_it.Get());
@@ -1098,7 +886,8 @@ namespace nFSMDBTests {
     EXPECT_EQ(3, seq_ptr_0->m_lbl_sites[lbl_id].GetSize());
     EXPECT_EQ(1, lbl_ptr->m_seq_ids.GetSize());
     EXPECT_TRUE(lbl_ptr->m_seq_ids.Has(seq_id_0));
-    pos_it = seq_ptr_0->m_lbl_sites[lbl_id].Begin(); {
+    {
+      Apto::Array<int>::Iterator pos_it = seq_ptr_0->m_lbl_sites[lbl_id].Begin();
       pos_it.Next(); EXPECT_EQ(1, *pos_it.Get());
       pos_it.Next(); EXPECT_EQ(8, *pos_it.Get());
       pos_it.Next(); EXPECT_EQ(15, *pos_it.Get());
@@ -1108,27 +897,29 @@ namespace nFSMDBTests {
     EXPECT_EQ(3, seq_ptr_0->m_lbl_sites[lbl_id].GetSize());
     EXPECT_EQ(1, lbl_ptr->m_seq_ids.GetSize());
     EXPECT_TRUE(lbl_ptr->m_seq_ids.Has(seq_id_0));
-    pos_it = seq_ptr_0->m_lbl_sites[lbl_id].Begin(); {
+    {
+      Apto::Array<int>::Iterator pos_it = seq_ptr_0->m_lbl_sites[lbl_id].Begin();
       pos_it.Next(); EXPECT_EQ(2, *pos_it.Get());
       pos_it.Next(); EXPECT_EQ(9, *pos_it.Get());
       pos_it.Next(); EXPECT_EQ(16, *pos_it.Get());
     }
   
     /* To help regenerate the above: */
-  //  for (cSequence::LabelIter lbl_it = seq_ptr_0->Labels(); lbl_it.Next();) {
-  //    int lbl_id = *lbl_it.Get();
-  //    cout << "lbl_it.Next(); lbl_id = *lbl_it.Get(); lbl_ptr = db.m_lbls.Get(lbl_id);" << endl;
-  //    cout << "EXPECT_EQ(db.m_label_utils.Seq2ID(\"" << db.m_label_utils.ID2Seq(lbl_id) << "\"), lbl_id);" << endl;
-  //    cout << "EXPECT_EQ(" << seq_ptr_0->m_lbl_sites[lbl_id].GetSize() << ", seq_ptr_0->m_lbl_sites[lbl_id].GetSize());" << endl;
-  //    cout << "EXPECT_EQ(" << lbl_ptr->m_seq_ids.GetSize() << ", lbl_ptr->m_seq_ids.GetSize());" << endl;
-  //    cout << "EXPECT_TRUE(lbl_ptr->m_seq_ids.Has(seq_id_0));" << endl;
-  //    cout << "pos_it = seq_ptr_0->m_lbl_sites[lbl_id].Begin(); {" << endl;
-  //    for (Apto::Set<int>::Iterator pos_it = seq_ptr_0->m_lbl_sites[lbl_id].Begin(); pos_it.Next();) {
-  //      int lbl_pos = *pos_it.Get();
-  //      cout << "  pos_it.Next(); EXPECT_EQ(" << lbl_pos << ", *pos_it.Get());" << endl;
-  //    }
-  //    cout << "}" << endl;
-  //  }
+    //for (Apto::Map<int, Apto::Array<int> >::KeyIterator lbl_it = seq_ptr_0->m_lbl_sites.Keys(); lbl_it.Next();) {
+    //  int lbl_id = *lbl_it.Get();
+    //  cout << "lbl_it.Next(); lbl_id = *lbl_it.Get(); lbl_ptr = db.m_lbls.Get(lbl_id);" << endl;
+    //  cout << "EXPECT_EQ(db.m_label_utils.Seq2ID(\"" << db.m_label_utils.ID2Seq(lbl_id) << "\"), lbl_id);" << endl;
+    //  cout << "EXPECT_EQ(" << seq_ptr_0->m_lbl_sites[lbl_id].GetSize() << ", seq_ptr_0->m_lbl_sites[lbl_id].GetSize());" << endl;
+    //  cout << "EXPECT_EQ(" << lbl_ptr->m_seq_ids.GetSize() << ", lbl_ptr->m_seq_ids.GetSize());" << endl;
+    //  cout << "EXPECT_TRUE(lbl_ptr->m_seq_ids.Has(seq_id_0));" << endl;
+    //  cout << "{" << endl;
+    //  cout << "  Apto::Array<int>::Iterator pos_it = seq_ptr_0->m_lbl_sites[lbl_id].Begin(); {" << endl;
+    //  for (Apto::Array<int>::Iterator pos_it = seq_ptr_0->m_lbl_sites[lbl_id].Begin(); pos_it.Next();) {
+    //    int lbl_pos = *pos_it.Get();
+    //    cout << "  pos_it.Next(); EXPECT_EQ(" << lbl_pos << ", *pos_it.Get());" << endl;
+    //  }
+    //  cout << "}" << endl;
+    //}
   
     /*
     Need to lookup:
@@ -1235,7 +1026,7 @@ namespace nFSMDBTests {
     */
     Apto::String seq_0("aaabaacaadabbabcabdacbaccacdadbadcaddbbbcbbdbccbcdbdcbddcccdcdddaa");
     int strand_id_0 = db.CreateStrand(seq_0);
-    EXPECT_EQ(1, db.m_strands.GetSize());
+    EXPECT_EQ(1, db.m_molecules.GetSize());
     EXPECT_EQ(1, db.m_seqs.GetSize());
     /*
     There are 64 unique labels of length three; 16 of length two; and four of
@@ -1244,20 +1035,859 @@ namespace nFSMDBTests {
     */
     EXPECT_EQ(84, db.m_lbls.GetSize());
     int strand_id_1 = db.CreateStrand(seq_0);
-    EXPECT_EQ(2, db.m_strands.GetSize());
+    EXPECT_EQ(2, db.m_molecules.GetSize());
     EXPECT_EQ(1, db.m_seqs.GetSize());
     EXPECT_EQ(84, db.m_lbls.GetSize());
     db.RemoveStrand(strand_id_1);
-    EXPECT_EQ(1, db.m_strands.GetSize());
+    EXPECT_EQ(1, db.m_molecules.GetSize());
     EXPECT_EQ(1, db.m_seqs.GetSize());
     EXPECT_EQ(84, db.m_lbls.GetSize());
     db.RemoveStrand(strand_id_0);
-    EXPECT_EQ(0, db.m_strands.GetSize());
+    EXPECT_EQ(0, db.m_molecules.GetSize());
     EXPECT_EQ(0, db.m_seqs.GetSize());
     EXPECT_EQ(0, db.m_lbls.GetSize());
   }
+
+
+  TEST(cFSMDB, brainstorm_3) {
+    cFSMDBTestFixture db;
+
+  }
 }
 
+
+namespace nBasicLabelUtilsTests {
+  TEST(cBasicLabelUtils, Rotate) {
+    cBasicLabelUtils u;
+    int id = u.Seq2ID("abcd");
+    int new_id = u.Rotate(id);
+    EXPECT_EQ(u.Seq2ID("abcd"), id);
+    EXPECT_EQ(u.Seq2ID("cdab"), new_id);
+  }
+
+  TEST(cBasicLabelUtils, ReverseComplement) {
+    cBasicLabelUtils u;
+    int id = u.Seq2ID("abcd");
+    int new_id = u.ReverseComplement(id);
+    EXPECT_EQ(u.Seq2ID("abcd"), id);
+    EXPECT_EQ(u.Seq2ID("badc"), new_id);
+  }
+}
+
+
+namespace nAptoSchedulerDynamicTests {
+  class ProbabilisticDynamicTestFixture : public Apto::Scheduler::ProbabilisticDynamic {
+  public:
+    ProbabilisticDynamicTestFixture(int num_entries, Apto::SmartPtr<Apto::RNG::AvidaRNG> rng)
+    : Apto::Scheduler::ProbabilisticDynamic(num_entries, rng)
+    {}
+    double ItemWeight(int entry_id) { return m_index.m_item_weight[entry_id]; }
+    double SubtreeWeight(int entry_id) { return m_index.m_subtree_weight[entry_id]; }
+  };
+
+  TEST(ProbabilisticDynamic, brainstorm_0) {
+    Apto::SmartPtr<Apto::RNG::AvidaRNG> rng(new Apto::RNG::AvidaRNG);
+    ProbabilisticDynamicTestFixture scheduler(5, rng);
+
+    for (int i = 0; i < scheduler.GetSize(); i++) { scheduler.AdjustPriority(i, i); }
+    EXPECT_EQ(0, scheduler.ItemWeight(0)); EXPECT_EQ(10, scheduler.SubtreeWeight(0));
+    EXPECT_EQ(1, scheduler.ItemWeight(1)); EXPECT_EQ(8, scheduler.SubtreeWeight(1));
+    EXPECT_EQ(2, scheduler.ItemWeight(2)); EXPECT_EQ(2, scheduler.SubtreeWeight(2));
+    EXPECT_EQ(3, scheduler.ItemWeight(3)); EXPECT_EQ(3, scheduler.SubtreeWeight(3));
+    EXPECT_EQ(4, scheduler.ItemWeight(4)); EXPECT_EQ(4, scheduler.SubtreeWeight(4));
+
+    /* To generate above EXPECTs: */
+    //for (int i = 0; i < scheduler.GetSize(); i++) {
+    //  cout << "EXPECT_EQ(" << scheduler.ItemWeight(i) << ", scheduler.ItemWeight(" << i << ")); EXPECT_EQ(" << scheduler.SubtreeWeight(i) << ", scheduler.SubtreeWeight(" << i << "));" << endl;
+    //}
+  }
+
+  TEST(ProbabilisticDynamic, brainstorm_1) {
+    Apto::SmartPtr<Apto::RNG::AvidaRNG> rng(new Apto::RNG::AvidaRNG);
+    ProbabilisticDynamicTestFixture scheduler(20, rng);
+
+    for (int i = 0; i < scheduler.GetSize(); i++) { scheduler.AdjustPriority(i, i); }
+    EXPECT_EQ(0, scheduler.ItemWeight(0)); EXPECT_EQ(190, scheduler.SubtreeWeight(0));
+    EXPECT_EQ(1, scheduler.ItemWeight(1)); EXPECT_EQ(127, scheduler.SubtreeWeight(1));
+    EXPECT_EQ(2, scheduler.ItemWeight(2)); EXPECT_EQ(63, scheduler.SubtreeWeight(2));
+    EXPECT_EQ(3, scheduler.ItemWeight(3)); EXPECT_EQ(84, scheduler.SubtreeWeight(3));
+    EXPECT_EQ(4, scheduler.ItemWeight(4)); EXPECT_EQ(42, scheduler.SubtreeWeight(4));
+    EXPECT_EQ(5, scheduler.ItemWeight(5)); EXPECT_EQ(28, scheduler.SubtreeWeight(5));
+    EXPECT_EQ(6, scheduler.ItemWeight(6)); EXPECT_EQ(33, scheduler.SubtreeWeight(6));
+    EXPECT_EQ(7, scheduler.ItemWeight(7)); EXPECT_EQ(38, scheduler.SubtreeWeight(7));
+    EXPECT_EQ(8, scheduler.ItemWeight(8)); EXPECT_EQ(43, scheduler.SubtreeWeight(8));
+    EXPECT_EQ(9, scheduler.ItemWeight(9)); EXPECT_EQ(28, scheduler.SubtreeWeight(9));
+    EXPECT_EQ(10, scheduler.ItemWeight(10)); EXPECT_EQ(10, scheduler.SubtreeWeight(10));
+    EXPECT_EQ(11, scheduler.ItemWeight(11)); EXPECT_EQ(11, scheduler.SubtreeWeight(11));
+    EXPECT_EQ(12, scheduler.ItemWeight(12)); EXPECT_EQ(12, scheduler.SubtreeWeight(12));
+    EXPECT_EQ(13, scheduler.ItemWeight(13)); EXPECT_EQ(13, scheduler.SubtreeWeight(13));
+    EXPECT_EQ(14, scheduler.ItemWeight(14)); EXPECT_EQ(14, scheduler.SubtreeWeight(14));
+    EXPECT_EQ(15, scheduler.ItemWeight(15)); EXPECT_EQ(15, scheduler.SubtreeWeight(15));
+    EXPECT_EQ(16, scheduler.ItemWeight(16)); EXPECT_EQ(16, scheduler.SubtreeWeight(16));
+    EXPECT_EQ(17, scheduler.ItemWeight(17)); EXPECT_EQ(17, scheduler.SubtreeWeight(17));
+    EXPECT_EQ(18, scheduler.ItemWeight(18)); EXPECT_EQ(18, scheduler.SubtreeWeight(18));
+    EXPECT_EQ(19, scheduler.ItemWeight(19)); EXPECT_EQ(19, scheduler.SubtreeWeight(19));
+
+    scheduler.Resize(5);
+    EXPECT_EQ(0, scheduler.ItemWeight(0)); EXPECT_EQ(10, scheduler.SubtreeWeight(0));
+    EXPECT_EQ(1, scheduler.ItemWeight(1)); EXPECT_EQ(8, scheduler.SubtreeWeight(1));
+    EXPECT_EQ(2, scheduler.ItemWeight(2)); EXPECT_EQ(2, scheduler.SubtreeWeight(2));
+    EXPECT_EQ(3, scheduler.ItemWeight(3)); EXPECT_EQ(3, scheduler.SubtreeWeight(3));
+    EXPECT_EQ(4, scheduler.ItemWeight(4)); EXPECT_EQ(4, scheduler.SubtreeWeight(4));
+
+    scheduler.Resize(20);
+    for (int i = 5; i < scheduler.GetSize(); i++) { scheduler.AdjustPriority(i, i); }
+    EXPECT_EQ(0, scheduler.ItemWeight(0)); EXPECT_EQ(190, scheduler.SubtreeWeight(0));
+    EXPECT_EQ(1, scheduler.ItemWeight(1)); EXPECT_EQ(127, scheduler.SubtreeWeight(1));
+    EXPECT_EQ(2, scheduler.ItemWeight(2)); EXPECT_EQ(63, scheduler.SubtreeWeight(2));
+    EXPECT_EQ(3, scheduler.ItemWeight(3)); EXPECT_EQ(84, scheduler.SubtreeWeight(3));
+    EXPECT_EQ(4, scheduler.ItemWeight(4)); EXPECT_EQ(42, scheduler.SubtreeWeight(4));
+    EXPECT_EQ(5, scheduler.ItemWeight(5)); EXPECT_EQ(28, scheduler.SubtreeWeight(5));
+    EXPECT_EQ(6, scheduler.ItemWeight(6)); EXPECT_EQ(33, scheduler.SubtreeWeight(6));
+    EXPECT_EQ(7, scheduler.ItemWeight(7)); EXPECT_EQ(38, scheduler.SubtreeWeight(7));
+    EXPECT_EQ(8, scheduler.ItemWeight(8)); EXPECT_EQ(43, scheduler.SubtreeWeight(8));
+    EXPECT_EQ(9, scheduler.ItemWeight(9)); EXPECT_EQ(28, scheduler.SubtreeWeight(9));
+    EXPECT_EQ(10, scheduler.ItemWeight(10)); EXPECT_EQ(10, scheduler.SubtreeWeight(10));
+    EXPECT_EQ(11, scheduler.ItemWeight(11)); EXPECT_EQ(11, scheduler.SubtreeWeight(11));
+    EXPECT_EQ(12, scheduler.ItemWeight(12)); EXPECT_EQ(12, scheduler.SubtreeWeight(12));
+    EXPECT_EQ(13, scheduler.ItemWeight(13)); EXPECT_EQ(13, scheduler.SubtreeWeight(13));
+    EXPECT_EQ(14, scheduler.ItemWeight(14)); EXPECT_EQ(14, scheduler.SubtreeWeight(14));
+    EXPECT_EQ(15, scheduler.ItemWeight(15)); EXPECT_EQ(15, scheduler.SubtreeWeight(15));
+    EXPECT_EQ(16, scheduler.ItemWeight(16)); EXPECT_EQ(16, scheduler.SubtreeWeight(16));
+    EXPECT_EQ(17, scheduler.ItemWeight(17)); EXPECT_EQ(17, scheduler.SubtreeWeight(17));
+    EXPECT_EQ(18, scheduler.ItemWeight(18)); EXPECT_EQ(18, scheduler.SubtreeWeight(18));
+    EXPECT_EQ(19, scheduler.ItemWeight(19)); EXPECT_EQ(19, scheduler.SubtreeWeight(19));
+
+    scheduler.Resize(5);
+    EXPECT_EQ(0, scheduler.ItemWeight(0)); EXPECT_EQ(10, scheduler.SubtreeWeight(0));
+    EXPECT_EQ(1, scheduler.ItemWeight(1)); EXPECT_EQ(8, scheduler.SubtreeWeight(1));
+    EXPECT_EQ(2, scheduler.ItemWeight(2)); EXPECT_EQ(2, scheduler.SubtreeWeight(2));
+    EXPECT_EQ(3, scheduler.ItemWeight(3)); EXPECT_EQ(3, scheduler.SubtreeWeight(3));
+    EXPECT_EQ(4, scheduler.ItemWeight(4)); EXPECT_EQ(4, scheduler.SubtreeWeight(4));
+
+    /* To generate above EXPECTs: */
+    //for (int i = 0; i < scheduler.GetSize(); i++) {
+    //  cout << "EXPECT_EQ(" << scheduler.ItemWeight(i) << ", scheduler.ItemWeight(" << i << ")); EXPECT_EQ(" << scheduler.SubtreeWeight(i) << ", scheduler.SubtreeWeight(" << i << "));" << endl;
+    //}
+  }
+
+  TEST(ProbabilisticDynamic, brainstorm_2) {
+    /* Seed random number generator. */
+    std::srand(0);
+    cFSMDB db;
+    db.m_label_utils.m_max_label_size = 4;
+    /* debruijn sequence with all triplets of a-d. */
+    Apto::String seq_0("aaabaacaadabbabcabdacbaccacdadbadcaddbbbcbbdbccbcdbdcbddcccdcdddaa");
+    Apto::String seq_1("abcdxyzabcdxyzabcd");
+    Apto::SmartPtr<Apto::RNG::AvidaRNG> rng(new Apto::RNG::AvidaRNG);
+
+
+    /* Load all strand molecules into scheduler. */
+    int strand_id_0 = db.CreateStrand(seq_0);
+    int strand_id_1 = db.CreateStrand(seq_0);
+    int strand_id_2 = db.CreateStrand(seq_1);
+    int strand_id_3 = db.CreateStrand(seq_1);
+
+    /*
+    Molecule collisions:
+    */
+    for (int i=0; i<20; i++) {
+      int next = db.m_collision_scheduler.Next();
+      cStrand* strand_ptr = db.m_molecules.Get<cStrand>(next);
+      if (strand_ptr) {
+        Apto::String seq(db.m_seqs.GetString(strand_ptr->m_seq_id));
+        cout << "i: " << i << ", next: " << next << ", seq: " << seq << endl;
+      }
+    }
+    for (int i=0; i<20; i++) {
+      /* Get a random collision of two molecules. */
+      int nxt_0 = db.m_collision_scheduler.Next();
+      int nxt_1 = db.m_collision_scheduler.Next();
+      /* Get both molecules. */
+      cMolecule* mol_0 = db.m_molecules.Get<cMolecule>(nxt_0);
+      cMolecule* mol_1 = db.m_molecules.Get<cMolecule>(nxt_1);
+      /* For this brainstorm, we can assume they're both strands. */
+      cStrand *std_0, *std_1;
+      std_0 = dynamic_cast<cStrand*>(mol_0);
+      std_1 = dynamic_cast<cStrand*>(mol_1);
+      /* Get the sequences for each strand. */
+      cSequence* seq_0(db.m_seqs.Get(std_0->m_seq_id));
+      cSequence* seq_1(db.m_seqs.Get(std_1->m_seq_id));
+      /* Print out the sequences. */
+      Apto::String str_0(db.m_seqs.GetString(std_0->m_seq_id));
+      Apto::String str_1(db.m_seqs.GetString(std_1->m_seq_id));
+      cout << "i: " << i << ", " << nxt_0 << ":str_0: " << str_0 << ", " << nxt_1 << ":str_1: " << str_1 << endl;
+      int lbl_ct_0 = seq_0->m_lbl_sites.GetSize();
+      int lbl_ct_1 = seq_1->m_lbl_sites.GetSize();
+      /* Walk through possible bindings; organize by length. */
+      Apto::Array<Apto::Array<int, Apto::Smart> > label_ids_by_length(db.m_label_utils.GetMaxLabelSize() + 1);
+      /*
+      (Here we're just choosing the shorter of the two sequences in hopes that
+      we can reduce processing time a bit.)
+      */
+      cSequence *seq_a, *seq_b;
+      int mol_id_a = -1, mol_id_b = -1;
+      cMolecule *mol_a, *mol_b;
+      if (lbl_ct_0 < lbl_ct_1) {
+        seq_a = seq_0; seq_b = seq_1;
+        mol_a = mol_0; mol_b = mol_1;
+        mol_id_a = nxt_0; mol_id_b = nxt_1;
+      } else {
+        seq_a = seq_1; seq_b = seq_0;
+        mol_a = mol_1; mol_b = mol_0;
+        mol_id_a = nxt_1; mol_id_b = nxt_0;
+      }
+      for (Apto::Map<int, Apto::Array<int> >::KeyIterator it = seq_a->m_lbl_sites.Keys(); it.Next();) {
+        const int lbl_id = *it.Get();
+        const int lbl_len = db.m_label_utils.SeqLen(lbl_id);
+        const int rvc_id = db.m_label_utils.ReverseComplement(lbl_id);
+        if (seq_b->m_lbl_sites.Has(rvc_id)) {
+          label_ids_by_length[lbl_len].Push(lbl_id);
+        }
+      }
+      /* Start trying to bind, giving preferences to longer binding sites. */
+      for (int length = label_ids_by_length.GetSize() - 1; 0 < length; length--) {
+        /*
+        Catalog all possible bindings, searching first by labels of this
+        length, together with their complements; and then by positions of each
+        label and its complement.
+        */
+        std::vector<int> halfbinding_ids;
+        int lbl_ct = label_ids_by_length[length].GetSize();
+        for (int j = 0; j < lbl_ct; j++) {
+          /*
+          Gather info about each possible pairing of a label and its
+          complement.
+          */
+          int lbl_id = label_ids_by_length[length][j];
+          int rvc_id = db.m_label_utils.ReverseComplement(lbl_id);
+          int lbl_position_ct = seq_a->m_lbl_sites[lbl_id].GetSize();
+          int rvc_position_ct = seq_b->m_lbl_sites[rvc_id].GetSize();
+          for (int k = 0; k < lbl_position_ct; k++) {
+            for (int l = 0; l < rvc_position_ct; l++) {
+              cHalfBinding *lbl_hb = db.m_half_bindings.Create();
+              cHalfBinding *rvc_hb = db.m_half_bindings.Create();
+              lbl_hb->m_parent_id = mol_id_a;
+              rvc_hb->m_parent_id = mol_id_b;
+              lbl_hb->m_lbl_id = lbl_id;
+              rvc_hb->m_lbl_id = rvc_id;
+              lbl_hb->m_lbl_pos = seq_a->m_lbl_sites[lbl_id][k];
+              rvc_hb->m_lbl_pos = seq_b->m_lbl_sites[rvc_id][l];
+              lbl_hb->m_lbl_len = length;
+              rvc_hb->m_lbl_len = length;
+              lbl_hb->m_other_half_binding_id = rvc_hb->ID();
+              rvc_hb->m_other_half_binding_id = lbl_hb->ID();
+              halfbinding_ids.push_back(lbl_hb->ID());
+            }
+          }
+        }
+        /* Shuffle binding ids. */
+        std::random_shuffle(halfbinding_ids.begin(), halfbinding_ids.end());
+        /*
+        Randomly select bindings, and discard bindings that won't work because
+        their positions have already been used, or bindings that randomly fail
+        to bind...
+        */
+        double point_binding_probability = 0.5;
+        double binding_probability = 1. - pow(1. - point_binding_probability, length);
+        for (std::vector<int>::iterator it=halfbinding_ids.begin(); it!=halfbinding_ids.end(); ++it) {
+          /* Get the two halves of the binding candidate. */
+          int half_binding_id = *it;
+          cHalfBinding *lbl_hb = db.m_half_bindings.Get(half_binding_id);
+          int other_half_binding_id = lbl_hb->m_other_half_binding_id;
+          cHalfBinding *rvc_hb = db.m_half_bindings.Get(other_half_binding_id);
+
+          /*
+          Check to see whether the pair can bind -- that is, whether their
+          respective binding positions are available for binding.
+          */
+          bool can_bind = true;
+          for (int j = 0; j < length; j++) {
+            if (mol_a->m_bindsites.Has(lbl_hb->m_lbl_pos + j)) { can_bind = false; }
+            if (mol_b->m_bindsites.Has(rvc_hb->m_lbl_pos + j)) { can_bind = false; }
+          }
+          /*
+          Flip a loaded coin to see whether the binding would succeed.
+          */
+          bool does_bind = (rng->GetDouble(0., 1.) < binding_probability);
+          if (can_bind && does_bind) {
+            /* If binding is possible and will succeed, bind! */
+            cout << "  binding: " << db.m_label_utils.ID2Seq(lbl_hb->m_lbl_id) << " (" << lbl_hb->m_lbl_pos << "), " << db.m_label_utils.ID2Seq(rvc_hb->m_lbl_id) << " (" << rvc_hb->m_lbl_pos << ")" << endl;
+            for (int j = 0; j < length; j++) {
+              /* In each molecule, mark all bound positions. */
+              mol_a->m_bindsites[lbl_hb->m_lbl_pos + j] = lbl_hb->ID();
+              mol_b->m_bindsites[rvc_hb->m_lbl_pos + j] = rvc_hb->ID();
+              cout << lbl_hb->m_lbl_pos + j << ":" << rvc_hb->m_lbl_pos + j << endl;
+            }
+          } else {
+            /* Delete failed bindings from database. */
+            db.m_half_bindings.Delete(lbl_hb->ID());
+            db.m_half_bindings.Delete(rvc_hb->ID());
+          }
+        }
+      }
+    }
+  }
+
+  TEST(IntegratedDynamic, brainstorm_0) {
+    Apto::Scheduler::IntegratedDynamic scheduler(5);
+    Apto::Array<int> hits(0);
+    int calls_to_next = 0;
+
+    hits.Resize(scheduler.GetSize());
+    hits.SetAll(0);
+    for (int i = 0; i < scheduler.GetSize(); i++) {
+      int priority = i + 1;
+      scheduler.AdjustPriority(i, priority);
+    }
+    calls_to_next = 0;
+    for (int i = 0; i < scheduler.GetSize(); i++) {
+      int priority = i + 1;
+      calls_to_next += priority;
+    }
+    for (int i = 0; i < calls_to_next; i++) {
+      int next = scheduler.Next();
+      hits[next] = hits[next] + 1;
+    }
+    for (int i = 0; i < scheduler.GetSize(); i++) { EXPECT_EQ(i+1, hits[i]); }
+
+    scheduler.Resize(10);
+    hits.Resize(scheduler.GetSize());
+    hits.SetAll(0);
+    for (int i = 5; i < scheduler.GetSize(); i++) {
+      int priority = i + 1;
+      scheduler.AdjustPriority(i, priority);
+    }
+    calls_to_next = 0;
+    for (int i = 0; i < scheduler.GetSize(); i++) {
+      int priority = i + 1;
+      calls_to_next += priority;
+    }
+    for (int i = 0; i < calls_to_next; i++) { int next = scheduler.Next(); }
+    for (int i = 0; i < calls_to_next; i++) {
+      int next = scheduler.Next();
+      hits[next] = hits[next] + 1;
+    }
+    for (int i = 0; i < scheduler.GetSize(); i++) { EXPECT_EQ(i+1, hits[i]); }
+
+    scheduler.Resize(5);
+    hits.Resize(scheduler.GetSize());
+    hits.SetAll(0);
+    calls_to_next = 0;
+    for (int i = 0; i < scheduler.GetSize(); i++) {
+      int priority = i + 1;
+      calls_to_next += priority;
+    }
+    for (int i = 0; i < calls_to_next; i++) {
+      int next = scheduler.Next();
+      hits[next] = hits[next] + 1;
+    }
+    for (int i = 0; i < scheduler.GetSize(); i++) { EXPECT_EQ(i+1, hits[i]); }
+  }
+}
+
+
+namespace nObjDeleteMeIdxTests {
+  class Feline : public ObjBase {
+  public:
+    static int s_ct;
+    int m_an_instance_variable;
+  public:
+    Feline(): m_an_instance_variable(0) { s_ct++; }
+    virtual ~Feline() { s_ct--; }
+  };
+  
+  class Lion : public Feline {
+  public:
+    static int s_ct;
+  public:
+    Lion(){ s_ct++; }
+    virtual ~Lion() { s_ct--; }
+  };
+  
+  class Tiger : public Feline {
+  public:
+    static int s_ct;
+  public:
+    Tiger(){ s_ct++; }
+    virtual ~Tiger() { s_ct--; }
+  };
+  
+  int Feline::s_ct(0);
+  int Lion::s_ct(0);
+  int Tiger::s_ct(0);
+
+  void PrintCounts() {
+    cout << "Feline::s_ct: " << Feline::s_ct << endl;
+    cout << "Lion::s_ct: " << Lion::s_ct << endl;
+    cout << "Tiger::s_ct: " << Tiger::s_ct << endl;
+  }
+
+  
+  class aClass {
+  public:
+    int m_variable;
+  };
+  TEST(AptoMap, DISABLED_int_SmartPtr_regression) {
+    Apto::Map<int, Apto::SmartPtr<aClass> > id2object;
+    for (int id = 0; id < 100; id++) {
+      id2object.Set(id, Apto::SmartPtr<aClass>(new aClass()));
+      bool ok = true;
+      for (Apto::Map<int, Apto::SmartPtr<aClass> >::KeyIterator it = id2object.Keys(); it.Next();) {
+        int test_id = *it.Get();
+        if (!id2object.Has(test_id)) {
+          cout << "id2object.Has(" << test_id << ")): " << id2object.Has(test_id) << endl;
+          ok = false;
+        } 
+        if (!id2object.Get(test_id)) {
+          cout << "id2object.Get(" << test_id << ")): " << id2object.Get(test_id) << endl;
+          ok = false;
+        } 
+      }
+      if (!ok) { cout << "problem after creating id " << id << endl; }
+      EXPECT_TRUE(ok);
+    }
+    Apto::SmartPtr<aClass> obj_23(id2object[23]), obj_46(id2object[46]), obj_69(id2object[69]), obj_92(id2object[92]);
+    {
+      int id = 0;
+      id2object.Remove(id);
+      bool ok = true;
+      for (Apto::Map<int, Apto::SmartPtr<aClass> >::KeyIterator it = id2object.Keys(); it.Next();) {
+        int test_id = *it.Get();
+        if (!id2object.Has(test_id)) {
+          cout << "id2object.Has(" << test_id << ")): " << id2object.Has(test_id) << endl;
+          ok = false;
+        } 
+        if (!id2object.Get(test_id)) {
+          cout << "id2object.Get(" << test_id << ")): " << id2object.Get(test_id) << endl;
+          ok = false;
+        } 
+      }
+      if (!ok) { cout << "problem after deleting id " << id << endl; }
+      EXPECT_TRUE(ok);
+    }
+    EXPECT_TRUE(obj_23);
+    EXPECT_TRUE(obj_46);
+    EXPECT_TRUE(obj_69);
+    EXPECT_TRUE(obj_92);
+    EXPECT_EQ(obj_23, id2object[23]);
+    EXPECT_EQ(obj_46, id2object[46]);
+    EXPECT_EQ(obj_69, id2object[69]);
+    EXPECT_EQ(obj_92, id2object[92]);
+    for (int id = 1; id < 100; id++) {
+      id2object.Remove(id);
+      bool ok = true;
+      for (Apto::Map<int, Apto::SmartPtr<aClass> >::KeyIterator it = id2object.Keys(); it.Next();) {
+        int test_id = *it.Get();
+        if (!id2object.Has(test_id)) {
+          cout << "id2object.Has(" << test_id << ")): " << id2object.Has(test_id) << endl;
+          ok = false;
+        } 
+        if (!id2object.Get(test_id)) {
+          cout << "id2object.Get(" << test_id << ")): " << id2object.Get(test_id) << endl;
+          ok = false;
+        } 
+      }
+      if (!ok) { cout << "problem after deleting id " << id << endl; }
+      EXPECT_TRUE(ok);
+    }
+  }
+
+  TEST(ObjIdx, instantiation) {
+    EXPECT_EQ(0, Feline::s_ct);
+    EXPECT_EQ(0, Lion::s_ct);
+    EXPECT_EQ(0, Tiger::s_ct);
+
+    ObjIdx<Feline> idx;
+
+    EXPECT_EQ(0, Feline::s_ct);
+    EXPECT_EQ(0, Lion::s_ct);
+    EXPECT_EQ(0, Tiger::s_ct);
+  }
+
+  TEST(ObjIdx, initial_state) {
+    EXPECT_EQ(0, Feline::s_ct);
+    EXPECT_EQ(0, Lion::s_ct);
+    EXPECT_EQ(0, Tiger::s_ct);
+
+    ObjIdx<Feline> idx;
+    EXPECT_EQ(0, idx.GetSize());
+    EXPECT_EQ(0, idx.GetMaxCt());
+
+    EXPECT_EQ(0, Feline::s_ct);
+    EXPECT_EQ(0, Lion::s_ct);
+    EXPECT_EQ(0, Tiger::s_ct);
+  }
+
+  TEST(ObjIdx, create_and_delete) {
+    EXPECT_EQ(0, Feline::s_ct);
+    EXPECT_EQ(0, Lion::s_ct);
+    EXPECT_EQ(0, Tiger::s_ct);
+
+    ObjIdx<Feline> idx;
+    Feline* ptr = idx.Create();
+    EXPECT_NE((Feline*)(0), ptr);
+    EXPECT_EQ(1, idx.GetSize());
+    EXPECT_EQ(1, idx.GetMaxCt());
+    EXPECT_EQ(0, ptr->ID());
+
+    EXPECT_EQ(1, Feline::s_ct);
+    EXPECT_EQ(0, Lion::s_ct);
+    EXPECT_EQ(0, Tiger::s_ct);
+
+    EXPECT_TRUE(idx.Delete(0));
+    EXPECT_EQ(0, idx.GetSize());
+    EXPECT_EQ(1, idx.GetMaxCt());
+    EXPECT_FALSE(idx.Delete(0));
+
+    EXPECT_EQ(0, Feline::s_ct);
+    EXPECT_EQ(0, Lion::s_ct);
+    EXPECT_EQ(0, Tiger::s_ct);
+  }
+
+  TEST(ObjIdx, polymorphic_create_and_delete) {
+    EXPECT_EQ(0, Feline::s_ct);
+    EXPECT_EQ(0, Lion::s_ct);
+    EXPECT_EQ(0, Tiger::s_ct);
+
+    ObjIdx<Feline> idx;
+    Lion* ptr = idx.Create<Lion>();
+    EXPECT_NE((Lion*)(0), ptr);
+    EXPECT_EQ(1, idx.GetSize());
+    EXPECT_EQ(1, idx.GetMaxCt());
+    EXPECT_EQ(0, ptr->ID());
+
+    EXPECT_EQ(1, Feline::s_ct);
+    EXPECT_EQ(1, Lion::s_ct);
+    EXPECT_EQ(0, Tiger::s_ct);
+
+    EXPECT_TRUE(idx.Delete(0));
+    EXPECT_EQ(0, idx.GetSize());
+    EXPECT_EQ(1, idx.GetMaxCt());
+    EXPECT_FALSE(idx.Delete(0));
+
+    EXPECT_EQ(0, Feline::s_ct);
+    EXPECT_EQ(0, Lion::s_ct);
+    EXPECT_EQ(0, Tiger::s_ct);
+  }
+
+  TEST(ObjIdx, destructor) {
+    EXPECT_EQ(0, Feline::s_ct);
+    EXPECT_EQ(0, Lion::s_ct);
+    EXPECT_EQ(0, Tiger::s_ct);
+
+    {
+      ObjIdx<Feline> idx;
+      Lion* ptr = idx.Create<Lion>();
+      EXPECT_NE((Lion*)(0), ptr);
+      EXPECT_EQ(1, idx.GetSize());
+      EXPECT_EQ(1, idx.GetMaxCt());
+      EXPECT_EQ(0, ptr->ID());
+
+      EXPECT_EQ(1, Feline::s_ct);
+      EXPECT_EQ(1, Lion::s_ct);
+      EXPECT_EQ(0, Tiger::s_ct);
+    }
+
+    /* We didn't explicitly Delete(); did destructor do it for us? */
+    EXPECT_EQ(0, Feline::s_ct);
+    EXPECT_EQ(0, Lion::s_ct);
+    EXPECT_EQ(0, Tiger::s_ct);
+  }
+
+  TEST(ObjIdx, has) {
+    ObjIdx<Feline> idx;
+    EXPECT_FALSE(idx.Has(0));
+    Feline* ptr = idx.Create();
+    int id = ptr->ID();
+    EXPECT_EQ(0, id);
+    EXPECT_TRUE(idx.Has(0));
+    EXPECT_TRUE(idx.Delete(0));
+    EXPECT_FALSE(idx.Has(0));
+  }
+
+  TEST(ObjIdx, has_with_polymorphic) {
+    ObjIdx<Feline> idx;
+    EXPECT_FALSE(idx.Has(0));
+    Lion* ptr = idx.Create<Lion>();
+    int id = ptr->ID();
+    EXPECT_EQ(0, id);
+    EXPECT_TRUE(idx.Has(0));
+    EXPECT_TRUE(idx.Delete(0));
+    EXPECT_FALSE(idx.Has(0));
+  }
+
+  TEST(ObjIdx, get) {
+    ObjIdx<Feline> idx;
+    EXPECT_EQ((Feline*)(0), idx.Get(0));
+    Feline* ptr = idx.Create();
+    EXPECT_NE((Feline*)(0), ptr);
+    int id = ptr->ID();
+    EXPECT_EQ(0, id);
+    EXPECT_EQ(ptr, idx.Get(0));
+    EXPECT_TRUE(idx.Delete(0));
+  }
+
+  TEST(ObjIdx, polymorphic_get) {
+    ObjIdx<Feline> idx;
+    EXPECT_EQ((Feline*)(0), idx.Get(0));
+    EXPECT_EQ((Feline*)(0), idx.Get(1));
+
+    Feline* feline_ptr = idx.Create();
+    EXPECT_NE((Feline*)(0), feline_ptr);
+    int feline_id = feline_ptr->ID();
+    EXPECT_EQ(0, feline_id);
+    EXPECT_EQ(feline_ptr, idx.Get(0));
+    /* dynamic cast of Feline to Lion should fail. */
+    EXPECT_EQ((Lion*)(0), idx.Get<Lion>(0));
+
+    Lion* lion_ptr = idx.Create<Lion>();
+    EXPECT_NE((Lion*)(0), lion_ptr);
+    int lion_id = lion_ptr->ID();
+    EXPECT_EQ(1, lion_id);
+    EXPECT_EQ(lion_ptr, idx.Get<Lion>(1));
+    /* dynamic cast of Lion to Feline should succeed. */
+    EXPECT_EQ((Feline*)(lion_ptr), idx.Get<Feline>(1));
+    EXPECT_EQ((Feline*)(lion_ptr), idx.Get(1));
+
+    Tiger* tiger_ptr = idx.Create<Tiger>();
+    EXPECT_NE((Tiger*)(0), tiger_ptr);
+    int tiger_id = tiger_ptr->ID();
+    EXPECT_EQ(2, tiger_id);
+    EXPECT_EQ(tiger_ptr, idx.Get<Tiger>(2));
+    /* dynamic cast of Tiger to Feline should succeed. */
+    EXPECT_EQ((Feline*)(tiger_ptr), idx.Get<Feline>(2));
+    EXPECT_EQ((Feline*)(tiger_ptr), idx.Get(2));
+    /* dynamic cast of Tiger to Lion should fail. */
+    EXPECT_EQ((Lion*)(0), idx.Get<Lion>(2));
+
+    EXPECT_TRUE(idx.Delete(2));
+    EXPECT_TRUE(idx.Delete(1));
+    EXPECT_TRUE(idx.Delete(0));
+  }
+
+  TEST(ObjIdx, handling_get_nonsense){
+    ObjIdx<Feline> idx;
+    EXPECT_EQ(0, idx.GetSize());
+    /* Try to get using a nonsense ID; should return null ptr. */
+    EXPECT_FALSE(idx.Get(-1));
+    /* Try to get using a bad ID; should return null ptr. */
+    EXPECT_FALSE(idx.Get(0));
+    /* Get with bad ptr should not accidentally add to index! */
+    EXPECT_EQ(0, idx.GetSize());
+  }
+
+  TEST(ObjIdx, persistence){
+    ObjIdx<Feline> idx;
+    /* Changes to a managed object should persist. */
+    int id = -1;
+    {
+      Feline* ptr_0 = idx.Create();
+      /* Initial value of instance variable should be zero. */
+      EXPECT_EQ(0, ptr_0->m_an_instance_variable);
+      ptr_0->m_an_instance_variable = 5;
+      id = ptr_0->ID();
+    }
+    {
+      Feline* ptr_1 = idx.Get(id);
+      /*
+      After value of instance variable was changed to 5, and object reaccessed,
+      value should still be 5.
+      */
+      EXPECT_EQ(5, ptr_1->m_an_instance_variable);
+    }
+    EXPECT_TRUE(idx.Delete(id));
+  }
+
+  TEST(ObjIdx, iterator) {
+    ObjIdx<Feline> idx;
+    int i=0;
+    for (i=0; i<100; i++){ EXPECT_EQ(i, idx.Create()->ID()); }
+    EXPECT_EQ(100, idx.GetSize());
+    EXPECT_EQ(100, idx.GetMaxCt());
+    i=0;
+    for (ObjIdx<Feline>::Iterator it = idx.Begin(); it.Next();){
+      Feline* ptr = it.Get();
+      EXPECT_NE((Feline*)(0), ptr);
+      EXPECT_EQ(i, it.ID());
+      EXPECT_EQ(i, ptr->ID());
+      i++;
+    }
+
+    /* Verify iterator skips deleted objects. */
+    EXPECT_TRUE(idx.Delete(0));
+    EXPECT_TRUE(idx.Delete(1));
+    i=2; /* We expect to start at id 2. */
+    for (ObjIdx<Feline>::Iterator it = idx.Begin(); it.Next();){
+      Feline* ptr = it.Get();
+      EXPECT_NE((Feline*)(0), ptr);
+      EXPECT_EQ(i, it.ID());
+      EXPECT_EQ(i, ptr->ID());
+      i++;
+    }
+
+    for (i=2; i<100; i++){ EXPECT_TRUE(idx.Delete(i)); }
+    EXPECT_EQ(0, idx.GetSize());
+    EXPECT_EQ(100, idx.GetMaxCt());
+  }
+
+  TEST(ObjIdx, polymorphic_iterator) {
+    EXPECT_EQ(0, Feline::s_ct);
+    EXPECT_EQ(0, Lion::s_ct);
+    EXPECT_EQ(0, Tiger::s_ct);
+
+    ObjIdx<Feline> idx;
+    EXPECT_EQ(0, idx.Create<Feline>()->ID());
+    EXPECT_EQ(1, idx.Create<Lion>()->ID());
+    EXPECT_EQ(2, idx.Create<Tiger>()->ID());
+    EXPECT_EQ(3, idx.Create<Feline>()->ID());
+    EXPECT_EQ(4, idx.Create<Lion>()->ID());
+    EXPECT_EQ(5, idx.Create<Tiger>()->ID());
+    EXPECT_EQ(6, idx.Create<Feline>()->ID());
+    EXPECT_EQ(7, idx.Create<Lion>()->ID());
+    EXPECT_EQ(8, idx.Create<Tiger>()->ID());
+    EXPECT_EQ(9, idx.Create<Feline>()->ID());
+
+    EXPECT_EQ(10, Feline::s_ct);
+    EXPECT_EQ(3, Lion::s_ct);
+    EXPECT_EQ(3, Tiger::s_ct);
+
+    /* Iterates through all objects, testing for Feline, Lion, or Tiger. */
+    ObjIdx<Feline>::Iterator feline_it = idx.Begin();
+    EXPECT_EQ(0, feline_it.Next<Feline>()->ID());
+    EXPECT_EQ(0, feline_it.Get<Feline>()->ID());
+    EXPECT_EQ((Lion*)(0), feline_it.Get<Lion>());
+    EXPECT_EQ((Tiger*)(0), feline_it.Get<Tiger>());
+    EXPECT_EQ(1, feline_it.Next<Feline>()->ID());
+    EXPECT_EQ(1, feline_it.Get<Feline>()->ID());
+    EXPECT_EQ(1, feline_it.Get<Lion>()->ID());
+    EXPECT_EQ((Tiger*)(0), feline_it.Get<Tiger>());
+    EXPECT_EQ(2, feline_it.Next<Feline>()->ID());
+    EXPECT_EQ(2, feline_it.Get<Feline>()->ID());
+    EXPECT_EQ((Lion*)(0), feline_it.Get<Lion>());
+    EXPECT_EQ(2, feline_it.Get<Tiger>()->ID());
+    EXPECT_EQ(3, feline_it.Next<Feline>()->ID());
+    EXPECT_EQ(3, feline_it.Get<Feline>()->ID());
+    EXPECT_EQ((Lion*)(0), feline_it.Get<Lion>());
+    EXPECT_EQ((Tiger*)(0), feline_it.Get<Tiger>());
+    EXPECT_EQ(4, feline_it.Next<Feline>()->ID());
+    EXPECT_EQ(4, feline_it.Get<Feline>()->ID());
+    EXPECT_EQ(4, feline_it.Get<Lion>()->ID());
+    EXPECT_EQ((Tiger*)(0), feline_it.Get<Tiger>());
+    EXPECT_EQ(5, feline_it.Next<Feline>()->ID());
+    EXPECT_EQ(5, feline_it.Get<Feline>()->ID());
+    EXPECT_EQ((Lion*)(0), feline_it.Get<Lion>());
+    EXPECT_EQ(5, feline_it.Get<Tiger>()->ID());
+    EXPECT_EQ(6, feline_it.Next<Feline>()->ID());
+    EXPECT_EQ(6, feline_it.Get<Feline>()->ID());
+    EXPECT_EQ((Lion*)(0), feline_it.Get<Lion>());
+    EXPECT_EQ((Tiger*)(0), feline_it.Get<Tiger>());
+    EXPECT_EQ(7, feline_it.Next<Feline>()->ID());
+    EXPECT_EQ(7, feline_it.Get<Feline>()->ID());
+    EXPECT_EQ(7, feline_it.Get<Lion>()->ID());
+    EXPECT_EQ((Tiger*)(0), feline_it.Get<Tiger>());
+    EXPECT_EQ(8, feline_it.Next<Feline>()->ID());
+    EXPECT_EQ(8, feline_it.Get<Feline>()->ID());
+    EXPECT_EQ((Lion*)(0), feline_it.Get<Lion>());
+    EXPECT_EQ(8, feline_it.Get<Tiger>()->ID());
+    EXPECT_EQ(9, feline_it.Next<Feline>()->ID());
+    EXPECT_EQ(9, feline_it.Get<Feline>()->ID());
+    EXPECT_EQ((Lion*)(0), feline_it.Get<Lion>());
+    EXPECT_EQ((Tiger*)(0), feline_it.Get<Tiger>());
+    EXPECT_EQ((Feline*)(0), feline_it.Next<Feline>());
+    EXPECT_EQ((Feline*)(0), feline_it.Get<Feline>());
+
+    /* Iterates through all Lion objects. */
+    ObjIdx<Feline>::Iterator lion_it = idx.Begin();
+    EXPECT_EQ(1, lion_it.Next<Lion>()->ID());
+    EXPECT_EQ(1, lion_it.Get<Lion>()->ID());
+    EXPECT_EQ(4, lion_it.Next<Lion>()->ID());
+    EXPECT_EQ(4, lion_it.Get<Lion>()->ID());
+    EXPECT_EQ(7, lion_it.Next<Lion>()->ID());
+    EXPECT_EQ(7, lion_it.Get<Lion>()->ID());
+    EXPECT_EQ((Lion*)(0), lion_it.Next<Lion>());
+    EXPECT_EQ((Lion*)(0), lion_it.Get<Lion>());
+
+    /* Iterates through all Tiger objects. */
+    ObjIdx<Feline>::Iterator tiger_it = idx.Begin();
+    EXPECT_EQ(2, tiger_it.Next<Tiger>()->ID());
+    EXPECT_EQ(2, tiger_it.Get<Tiger>()->ID());
+    EXPECT_EQ(5, tiger_it.Next<Tiger>()->ID());
+    EXPECT_EQ(5, tiger_it.Get<Tiger>()->ID());
+    EXPECT_EQ(8, tiger_it.Next<Tiger>()->ID());
+    EXPECT_EQ(8, tiger_it.Get<Tiger>()->ID());
+    EXPECT_EQ((Tiger*)(0), tiger_it.Next<Tiger>());
+    EXPECT_EQ((Tiger*)(0), tiger_it.Get<Tiger>());
+
+    /* Iterates through all Tiger objects, except id 5, which is deleted. */
+    EXPECT_TRUE(idx.Delete(5));
+    ObjIdx<Feline>::Iterator tiger_it_1 = idx.Begin();
+    EXPECT_EQ(2, tiger_it_1.Next<Tiger>()->ID());
+    EXPECT_EQ(2, tiger_it_1.Get<Tiger>()->ID());
+    EXPECT_EQ(8, tiger_it_1.Next<Tiger>()->ID());
+    EXPECT_EQ(8, tiger_it_1.Get<Tiger>()->ID());
+    EXPECT_EQ((Tiger*)(0), tiger_it_1.Next<Tiger>());
+    EXPECT_EQ((Tiger*)(0), tiger_it_1.Get<Tiger>());
+
+    //idx.Print<Tiger>();
+    //idx.Print();
+
+    EXPECT_TRUE(idx.Delete(9));
+    EXPECT_TRUE(idx.Delete(8));
+    EXPECT_TRUE(idx.Delete(7));
+    EXPECT_TRUE(idx.Delete(6));
+    /* ID 5 was already deleted. */
+    EXPECT_FALSE(idx.Delete(5));
+    EXPECT_TRUE(idx.Delete(4));
+    EXPECT_TRUE(idx.Delete(3));
+    EXPECT_TRUE(idx.Delete(2));
+    EXPECT_TRUE(idx.Delete(1));
+    EXPECT_TRUE(idx.Delete(0));
+
+    EXPECT_EQ(0, Feline::s_ct);
+    EXPECT_EQ(0, Lion::s_ct);
+    EXPECT_EQ(0, Tiger::s_ct);
+  }
+
+  TEST(ObjIdx, recycling_ids) {
+    EXPECT_EQ(0, Feline::s_ct);
+    EXPECT_EQ(0, Lion::s_ct);
+    EXPECT_EQ(0, Tiger::s_ct);
+
+    ObjIdx<Feline> idx;
+
+    for (int i=0; i<100; i++){ EXPECT_EQ(i, idx.Create()->ID()); }
+    EXPECT_EQ(100, idx.GetSize());
+    EXPECT_EQ(100, idx.GetMaxCt());
+    EXPECT_EQ(100, Feline::s_ct);
+
+    for (int i=0; i<50; i++){ EXPECT_TRUE(idx.Delete(i)); }
+    EXPECT_EQ(50, idx.GetSize());
+    EXPECT_EQ(100, idx.GetMaxCt());
+    EXPECT_EQ(50, Feline::s_ct);
+
+    /* First 50 IDs should now be recycled. */
+    for (int i=49; 0<=i; i--){ EXPECT_EQ(i, idx.Create()->ID()); }
+    EXPECT_EQ(100, idx.GetSize());
+    EXPECT_EQ(100, idx.GetMaxCt());
+    EXPECT_EQ(100, Feline::s_ct);
+
+    /* Next 50 IDs should start from 100. */
+    for (int i=100; i<150; i++){ EXPECT_EQ(i, idx.Create()->ID()); }
+    EXPECT_EQ(150, idx.GetSize());
+    EXPECT_EQ(150, idx.GetMaxCt());
+    EXPECT_EQ(150, Feline::s_ct);
+
+    for (int i=0; i<150; i++){ EXPECT_TRUE(idx.Delete(i)); }
+    EXPECT_EQ(0, idx.GetSize());
+    EXPECT_EQ(150, idx.GetMaxCt());
+    EXPECT_EQ(0, Feline::s_ct);
+
+    EXPECT_EQ(0, Feline::s_ct);
+    EXPECT_EQ(0, Lion::s_ct);
+    EXPECT_EQ(0, Tiger::s_ct);
+  }
+}
 
 
 //TEST(cStrand, brainstorm_workflow){
@@ -1336,7 +1966,7 @@ namespace nFSMDBTests {
 
   ///* Scan new sequence for labels. */
   //int seq_id = m_seqs.Insert(seq);
-  //Apto::Array<cLabelHit, Apto::Smart> hits(bScanForLabels(seq_id, *this));
+  //Apto::Array<cHit, Apto::Smart> hits(bScanForLabels(seq_id, *this));
   //for (int i=0; i<hits.GetSize(); i++) {
   //  //LinkSeqLblPos(seq_id, hits[i].Lbl(), hits[i].Pos());
   //}

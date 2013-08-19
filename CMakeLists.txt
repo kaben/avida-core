@@ -185,6 +185,7 @@ SET(CPU_SOURCES
   ${CPU_DIR}/cHardwareTransSMT.cc
   ${CPU_DIR}/cHeadCPU.cc
   ${CPU_DIR}/cInstSet.cc
+  ${CPU_DIR}/cStrand.cc
   ${CPU_DIR}/cTestCPU.cc
   ${CPU_DIR}/cTestCPUInterface.cc
 )
@@ -579,12 +580,16 @@ OPTION(AVD_UNIT_TESTS
   OFF
 )
 IF(AVD_UNIT_TESTS)
-  SET(UNIT_TESTS_DIR source/targets/unit-tests)
+  INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/../libs/apto/utils/unittest/googletest/include)
+  #SET(UNIT_TESTS_DIR source/targets/unit-tests)
+  SET(UNIT_TESTS_DIR unittests)
   SET(UNIT_TESTS_SOURCES
     ${UNIT_TESTS_DIR}/main.cc
-    ${TOOLS_DIR}/cBitArray.cc
+    #${TOOLS_DIR}/cBitArray.cc
+    ${UNIT_TESTS_DIR}/core/Strand.cc
   )
   ADD_EXECUTABLE(unit-tests ${UNIT_TESTS_SOURCES})
+  TARGET_LINK_LIBRARIES(unit-tests ${AVIDA_CMDLINE_LIBS} gtest)
   INSTALL_TARGETS(/work unit-tests)
 ENDIF(AVD_UNIT_TESTS)
 
