@@ -530,7 +530,7 @@ bool cFSMDB::RemoveSequence(int seq_id) {
 }
 int cFSMDB::CreateStrand(const Apto::String &seq) {
   /* Get or create strand and sequence */
-  cStrand* strand_ptr = m_molecules.Create<cStrand>();
+  cStrand* strand_ptr = m_bindables.Create<cStrand>();
   int strand_id = strand_ptr->ID();
   int seq_id = InsertSequence(seq);
   cSequence* seq_ptr = m_seqs.Get(seq_id);
@@ -543,19 +543,19 @@ int cFSMDB::CreateStrand(const Apto::String &seq) {
   This is a place where we might be able to control the probability that two
   particular molecules will collide.
   */
-  m_collision_scheduler.Resize(m_molecules.GetMaxCt());
+  m_collision_scheduler.Resize(m_bindables.GetMaxCt());
   m_collision_scheduler.AdjustPriority(strand_id, seq.GetSize());
   return strand_id;
 }
 bool cFSMDB::RemoveStrand(int strand_id) {
-  cStrand* strand_ptr = m_molecules.Get<cStrand>(strand_id);
+  cStrand* strand_ptr = m_bindables.Get<cStrand>(strand_id);
   if (strand_ptr) {
     cSequence* seq_ptr = m_seqs.Get(strand_ptr->m_seq_id);
     seq_ptr->m_strand_ids.Remove(strand_id);
     if (seq_ptr->m_strand_ids.GetSize() < 1) { RemoveSequence(strand_ptr->m_seq_id); }
     /* Unschedule collisions for this strand ID. */
     m_collision_scheduler.AdjustPriority(strand_id, 0.);
-    return m_molecules.Delete(strand_id);
+    return m_bindables.Delete(strand_id);
   } else { return false; }
 }
 

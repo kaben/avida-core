@@ -38,7 +38,39 @@ using namespace std;
 
 
 /*
-BOOKMARK 20130818-2146
+BOOKMARK 20130819-2217
+- Possible solution to need for overlapping bindings implemented by changing
+  cBindable::m_bindpts from Map<int, int> to Map<int, Array<int> >. Thus each
+  bindable position has not a possibly-empty slot for a single half-binding id,
+  but a possibly-empty slot for a stack of half-binding ids.
+BOOKMARK 20130819-1303
+Thoughts:
+- Possible processing steps:
+  - ProcessChemicalKinetics()
+  - ProcessFSMs()
+- It seems to me this should just be a ProcessStep() function, which executes
+  any of the following according to some schedule:
+  - chemical kinetics
+  - FSMs
+- It occurs to me that FSMs might be thought of as in the domain of chemical
+  kinetics.
+  - The problem with this is that I'm thinking of kinetics in terms of
+    collisions on the one hand, and in terms of FSM steps on the other hand. To
+    put them in the same terms would mean adding possibly-avoidable complexity.
+BOOKMARK 20130819-0800
+Thoughts:
+- When two strands are bound, other strands can't bind at the bound positions.
+  - This is in part intentional, as it can be used for regulation of gene
+    expression, which is its intended purpose.
+  - On the other hand, it seems like certain FSMs should be able to temporarily
+    unbind and then rebind the bound strands, by analogy to RNA synthesis from
+    DNA.
+  - So a bound pair of strands needs to be able to collide with an FSM, which
+    should be able to unbind the pair.
+  - Perhaps multiple bindings should be allowed, although a second binding
+    might have a lower probability.
+  - I might also permit a binding to disrupt another.
+  - This might all be abstracted into a chemical kinetics manager.
 Next steps:
 - Resume work on collisions.
 */
@@ -1026,7 +1058,7 @@ namespace nFSMDBTests {
     */
     Apto::String seq_0("aaabaacaadabbabcabdacbaccacdadbadcaddbbbcbbdbccbcdbdcbddcccdcdddaa");
     int strand_id_0 = db.CreateStrand(seq_0);
-    EXPECT_EQ(1, db.m_molecules.GetSize());
+    EXPECT_EQ(1, db.m_bindables.GetSize());
     EXPECT_EQ(1, db.m_seqs.GetSize());
     /*
     There are 64 unique labels of length three; 16 of length two; and four of
@@ -1035,15 +1067,15 @@ namespace nFSMDBTests {
     */
     EXPECT_EQ(84, db.m_lbls.GetSize());
     int strand_id_1 = db.CreateStrand(seq_0);
-    EXPECT_EQ(2, db.m_molecules.GetSize());
+    EXPECT_EQ(2, db.m_bindables.GetSize());
     EXPECT_EQ(1, db.m_seqs.GetSize());
     EXPECT_EQ(84, db.m_lbls.GetSize());
     db.RemoveStrand(strand_id_1);
-    EXPECT_EQ(1, db.m_molecules.GetSize());
+    EXPECT_EQ(1, db.m_bindables.GetSize());
     EXPECT_EQ(1, db.m_seqs.GetSize());
     EXPECT_EQ(84, db.m_lbls.GetSize());
     db.RemoveStrand(strand_id_0);
-    EXPECT_EQ(0, db.m_molecules.GetSize());
+    EXPECT_EQ(0, db.m_bindables.GetSize());
     EXPECT_EQ(0, db.m_seqs.GetSize());
     EXPECT_EQ(0, db.m_lbls.GetSize());
   }
@@ -1192,24 +1224,16 @@ namespace nAptoSchedulerDynamicTests {
     Molecule collisions:
     */
     for (int i=0; i<20; i++) {
-      int next = db.m_collision_scheduler.Next();
-      cStrand* strand_ptr = db.m_molecules.Get<cStrand>(next);
-      if (strand_ptr) {
-        Apto::String seq(db.m_seqs.GetString(strand_ptr->m_seq_id));
-        cout << "i: " << i << ", next: " << next << ", seq: " << seq << endl;
-      }
-    }
-    for (int i=0; i<20; i++) {
       /* Get a random collision of two molecules. */
       int nxt_0 = db.m_collision_scheduler.Next();
       int nxt_1 = db.m_collision_scheduler.Next();
       /* Get both molecules. */
-      cMolecule* mol_0 = db.m_molecules.Get<cMolecule>(nxt_0);
-      cMolecule* mol_1 = db.m_molecules.Get<cMolecule>(nxt_1);
+      cBindable* bbl_0 = db.m_bindables.Get<cBindable>(nxt_0);
+      cBindable* bbl_1 = db.m_bindables.Get<cBindable>(nxt_1);
       /* For this brainstorm, we can assume they're both strands. */
       cStrand *std_0, *std_1;
-      std_0 = dynamic_cast<cStrand*>(mol_0);
-      std_1 = dynamic_cast<cStrand*>(mol_1);
+      std_0 = dynamic_cast<cStrand*>(bbl_0);
+      std_1 = dynamic_cast<cStrand*>(bbl_1);
       /* Get the sequences for each strand. */
       cSequence* seq_0(db.m_seqs.Get(std_0->m_seq_id));
       cSequence* seq_1(db.m_seqs.Get(std_1->m_seq_id));
@@ -1226,16 +1250,16 @@ namespace nAptoSchedulerDynamicTests {
       we can reduce processing time a bit.)
       */
       cSequence *seq_a, *seq_b;
-      int mol_id_a = -1, mol_id_b = -1;
-      cMolecule *mol_a, *mol_b;
+      int bbl_id_a = -1, bbl_id_b = -1;
+      cBindable *bbl_a, *bbl_b;
       if (lbl_ct_0 < lbl_ct_1) {
         seq_a = seq_0; seq_b = seq_1;
-        mol_a = mol_0; mol_b = mol_1;
-        mol_id_a = nxt_0; mol_id_b = nxt_1;
+        bbl_a = bbl_0; bbl_b = bbl_1;
+        bbl_id_a = nxt_0; bbl_id_b = nxt_1;
       } else {
         seq_a = seq_1; seq_b = seq_0;
-        mol_a = mol_1; mol_b = mol_0;
-        mol_id_a = nxt_1; mol_id_b = nxt_0;
+        bbl_a = bbl_1; bbl_b = bbl_0;
+        bbl_id_a = nxt_1; bbl_id_b = nxt_0;
       }
       for (Apto::Map<int, Apto::Array<int> >::KeyIterator it = seq_a->m_lbl_sites.Keys(); it.Next();) {
         const int lbl_id = *it.Get();
@@ -1246,20 +1270,20 @@ namespace nAptoSchedulerDynamicTests {
         }
       }
       /* Start trying to bind, giving preferences to longer binding sites. */
-      for (int length = label_ids_by_length.GetSize() - 1; 0 < length; length--) {
+      for (int len = label_ids_by_length.GetSize() - 1; 0 < len; len--) {
         /*
         Catalog all possible bindings, searching first by labels of this
         length, together with their complements; and then by positions of each
         label and its complement.
         */
         std::vector<int> halfbinding_ids;
-        int lbl_ct = label_ids_by_length[length].GetSize();
+        int lbl_ct = label_ids_by_length[len].GetSize();
         for (int j = 0; j < lbl_ct; j++) {
           /*
           Gather info about each possible pairing of a label and its
           complement.
           */
-          int lbl_id = label_ids_by_length[length][j];
+          int lbl_id = label_ids_by_length[len][j];
           int rvc_id = db.m_label_utils.ReverseComplement(lbl_id);
           int lbl_position_ct = seq_a->m_lbl_sites[lbl_id].GetSize();
           int rvc_position_ct = seq_b->m_lbl_sites[rvc_id].GetSize();
@@ -1267,16 +1291,9 @@ namespace nAptoSchedulerDynamicTests {
             for (int l = 0; l < rvc_position_ct; l++) {
               cHalfBinding *lbl_hb = db.m_half_bindings.Create();
               cHalfBinding *rvc_hb = db.m_half_bindings.Create();
-              lbl_hb->m_parent_id = mol_id_a;
-              rvc_hb->m_parent_id = mol_id_b;
-              lbl_hb->m_lbl_id = lbl_id;
-              rvc_hb->m_lbl_id = rvc_id;
-              lbl_hb->m_lbl_pos = seq_a->m_lbl_sites[lbl_id][k];
-              rvc_hb->m_lbl_pos = seq_b->m_lbl_sites[rvc_id][l];
-              lbl_hb->m_lbl_len = length;
-              rvc_hb->m_lbl_len = length;
-              lbl_hb->m_other_half_binding_id = rvc_hb->ID();
-              rvc_hb->m_other_half_binding_id = lbl_hb->ID();
+
+              lbl_hb->Set(bbl_id_a, lbl_id, seq_a->m_lbl_sites[lbl_id][k], len, rvc_hb->ID());
+              rvc_hb->Set(bbl_id_b, rvc_id, seq_b->m_lbl_sites[rvc_id][l], len, lbl_hb->ID());
               halfbinding_ids.push_back(lbl_hb->ID());
             }
           }
@@ -1288,23 +1305,38 @@ namespace nAptoSchedulerDynamicTests {
         their positions have already been used, or bindings that randomly fail
         to bind...
         */
+        /*
+        I chose these probabilities pretty much arbitrarily. For the purposes
+        of brainstorming, I made longer bindings more probable than shorter
+        bindings. But this isn't necessarily how I think binding will
+        eventually work.
+        */
         double point_binding_probability = 0.5;
-        double binding_probability = 1. - pow(1. - point_binding_probability, length);
+        double binding_probability = 1. - pow(1. - point_binding_probability, len);
         for (std::vector<int>::iterator it=halfbinding_ids.begin(); it!=halfbinding_ids.end(); ++it) {
           /* Get the two halves of the binding candidate. */
           int half_binding_id = *it;
           cHalfBinding *lbl_hb = db.m_half_bindings.Get(half_binding_id);
           int other_half_binding_id = lbl_hb->m_other_half_binding_id;
           cHalfBinding *rvc_hb = db.m_half_bindings.Get(other_half_binding_id);
-
           /*
           Check to see whether the pair can bind -- that is, whether their
           respective binding positions are available for binding.
           */
           bool can_bind = true;
-          for (int j = 0; j < length; j++) {
-            if (mol_a->m_bindsites.Has(lbl_hb->m_lbl_pos + j)) { can_bind = false; }
-            if (mol_b->m_bindsites.Has(rvc_hb->m_lbl_pos + j)) { can_bind = false; }
+          for (int j = 0; j < len; j++) {
+            int lbl_chk = lbl_hb->m_lbl_pos + j;
+            int rvc_chk = rvc_hb->m_lbl_pos + j;
+            /*
+            For brainstorming, we're only allowing one binding at a particular
+            point, but code for the class allows more than one binding.
+            */
+            if (bbl_a->m_bindpts.Has(lbl_chk) && (bbl_a->m_bindpts[lbl_chk].GetSize()>0)){
+              can_bind = false;
+            }
+            if (bbl_b->m_bindpts.Has(rvc_chk) && (bbl_b->m_bindpts[rvc_chk].GetSize()>0)){
+              can_bind = false;
+            }
           }
           /*
           Flip a loaded coin to see whether the binding would succeed.
@@ -1313,10 +1345,12 @@ namespace nAptoSchedulerDynamicTests {
           if (can_bind && does_bind) {
             /* If binding is possible and will succeed, bind! */
             cout << "  binding: " << db.m_label_utils.ID2Seq(lbl_hb->m_lbl_id) << " (" << lbl_hb->m_lbl_pos << "), " << db.m_label_utils.ID2Seq(rvc_hb->m_lbl_id) << " (" << rvc_hb->m_lbl_pos << ")" << endl;
-            for (int j = 0; j < length; j++) {
+            for (int j = 0; j < len; j++) {
               /* In each molecule, mark all bound positions. */
-              mol_a->m_bindsites[lbl_hb->m_lbl_pos + j] = lbl_hb->ID();
-              mol_b->m_bindsites[rvc_hb->m_lbl_pos + j] = rvc_hb->ID();
+              int lbl_chk = lbl_hb->m_lbl_pos + j;
+              int rvc_chk = rvc_hb->m_lbl_pos + j;
+              bbl_a->m_bindpts[lbl_chk].Push(lbl_hb->ID());
+              bbl_b->m_bindpts[rvc_chk].Push(rvc_hb->ID());
               cout << lbl_hb->m_lbl_pos + j << ":" << rvc_hb->m_lbl_pos + j << endl;
             }
           } else {
@@ -1326,6 +1360,7 @@ namespace nAptoSchedulerDynamicTests {
           }
         }
       }
+
     }
   }
 

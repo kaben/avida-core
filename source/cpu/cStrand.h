@@ -42,6 +42,7 @@
 class IDs;
 class ObjBase;
 class cBasicLabelUtils;
+class cBindable;
 class cBindsite;
 class cFSM;
 class cFSMDB;
@@ -49,7 +50,6 @@ class cFSMDef;
 class cHit;
 class cLabel;
 class cLabelDeletemeIdx;
-class cMolecule;
 class cSeqIdx;
 class cSequence;
 class cStrand;
@@ -257,22 +257,13 @@ public:
   int m_lbl_pos;
   int m_lbl_len;
   int m_other_half_binding_id;
-};
-
-
-class cMolecule: public ObjBase {
-public:
-  /* Index by position of bindsites. */
-  Apto::Map<int, int> m_bindsites;
-public:
-  virtual ~cMolecule(){}
-};
-
-
-class cFSM : public cMolecule {
-public:
-  int m_fsm_def_id;
-  Apto::Set<int> m_bindsite_ids;
+  void Set(int parent_id, int lbl_id, int lbl_pos, int lbl_len, int other_half_binding_id){
+    m_parent_id = parent_id;
+    m_lbl_id = lbl_id;
+    m_lbl_pos = lbl_pos;
+    m_lbl_len = lbl_len;
+    m_other_half_binding_id = other_half_binding_id;
+  }
 };
 
 
@@ -314,7 +305,23 @@ public:
 };
 
 
-class cStrand : public cMolecule {
+class cBindable: public ObjBase {
+public:
+  /* Index by position of bindsites. */
+  Apto::Map<int, Apto::Array<int> > m_bindpts;
+public:
+  virtual ~cBindable(){}
+};
+
+
+class cFSM : public cBindable {
+public:
+  int m_fsm_def_id;
+  Apto::Set<int> m_bindsite_ids;
+};
+
+
+class cStrand : public cBindable {
 public:
   int m_seq_id;
   Apto::Set<int> m_bindsite_ids;
@@ -469,6 +476,9 @@ public:
 };
 
 
+class cKinetics : public ObjIdx<cBindable> {
+public:
+};
 
 class cFSMDB {
 public:
@@ -477,7 +487,8 @@ public:
   ObjIdx<cBindsite> m_bindsites;
   ObjIdx<cFSMDef> m_fsm_defs;
   ObjIdx<cHalfBinding> m_half_bindings;
-  ObjIdx<cMolecule> m_molecules;
+  ObjIdx<cBindable> m_bindables;
+  //cKinetics m_bindables;
 
   Apto::SmartPtr<Apto::RNG::AvidaRNG> m_rng;
   Apto::Scheduler::ProbabilisticDynamic m_collision_scheduler;
@@ -486,6 +497,8 @@ public:
 
   int CreateStrand(const Apto::String &sequence);
   bool RemoveStrand(int strand_id);
+
+  
 public:
   cFSMDB()
   : m_rng(new Apto::RNG::AvidaRNG)
