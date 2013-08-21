@@ -29,9 +29,6 @@
 #include "gtest/gtest.h"
 
 #include <iostream>
-#include <algorithm>    // std::random_shuffle
-#include <vector>       // std::vector
-#include <cmath>        // double pow (double base, double exponent);
 #include <cstdlib>      // std::rand, std::srand
 
 using namespace std;
@@ -1213,155 +1210,12 @@ namespace nAptoSchedulerDynamicTests {
     Apto::String seq_1("abcdxyzabcdxyzabcd");
     Apto::SmartPtr<Apto::RNG::AvidaRNG> rng(new Apto::RNG::AvidaRNG);
 
+    /* Load strand molecules into scheduler. */
+    for (int i=0; i<5; i++) { db.CreateStrand(seq_0); }
+    for (int i=0; i<5; i++) { db.CreateStrand(seq_1); }
 
-    /* Load all strand molecules into scheduler. */
-    int strand_id_0 = db.CreateStrand(seq_0);
-    int strand_id_1 = db.CreateStrand(seq_0);
-    int strand_id_2 = db.CreateStrand(seq_1);
-    int strand_id_3 = db.CreateStrand(seq_1);
-
-    /*
-    Molecule collisions:
-    */
-    for (int i=0; i<20; i++) {
-      /* Get a random collision of two molecules. */
-      int nxt_0 = db.m_collision_scheduler.Next();
-      int nxt_1 = db.m_collision_scheduler.Next();
-      /* Get both molecules. */
-      cBindable* bbl_0 = db.m_bindables.Get<cBindable>(nxt_0);
-      cBindable* bbl_1 = db.m_bindables.Get<cBindable>(nxt_1);
-      /* For this brainstorm, we can assume they're both strands. */
-      cStrand *std_0, *std_1;
-      std_0 = dynamic_cast<cStrand*>(bbl_0);
-      std_1 = dynamic_cast<cStrand*>(bbl_1);
-      /* Get the sequences for each strand. */
-      cSequence* seq_0(db.m_seqs.Get(std_0->m_seq_id));
-      cSequence* seq_1(db.m_seqs.Get(std_1->m_seq_id));
-      /* Print out the sequences. */
-      Apto::String str_0(db.m_seqs.GetString(std_0->m_seq_id));
-      Apto::String str_1(db.m_seqs.GetString(std_1->m_seq_id));
-      cout << "i: " << i << ", " << nxt_0 << ":str_0: " << str_0 << ", " << nxt_1 << ":str_1: " << str_1 << endl;
-      int lbl_ct_0 = seq_0->m_lbl_sites.GetSize();
-      int lbl_ct_1 = seq_1->m_lbl_sites.GetSize();
-      /* Walk through possible bindings; organize by length. */
-      Apto::Array<Apto::Array<int, Apto::Smart> > label_ids_by_length(db.m_label_utils.GetMaxLabelSize() + 1);
-      /*
-      (Here we're just choosing the shorter of the two sequences in hopes that
-      we can reduce processing time a bit.)
-      */
-      cSequence *seq_a, *seq_b;
-      int bbl_id_a = -1, bbl_id_b = -1;
-      cBindable *bbl_a, *bbl_b;
-      if (lbl_ct_0 < lbl_ct_1) {
-        seq_a = seq_0; seq_b = seq_1;
-        bbl_a = bbl_0; bbl_b = bbl_1;
-        bbl_id_a = nxt_0; bbl_id_b = nxt_1;
-      } else {
-        seq_a = seq_1; seq_b = seq_0;
-        bbl_a = bbl_1; bbl_b = bbl_0;
-        bbl_id_a = nxt_1; bbl_id_b = nxt_0;
-      }
-      for (Apto::Map<int, Apto::Array<int> >::KeyIterator it = seq_a->m_lbl_sites.Keys(); it.Next();) {
-        const int lbl_id = *it.Get();
-        const int lbl_len = db.m_label_utils.SeqLen(lbl_id);
-        const int rvc_id = db.m_label_utils.ReverseComplement(lbl_id);
-        if (seq_b->m_lbl_sites.Has(rvc_id)) {
-          label_ids_by_length[lbl_len].Push(lbl_id);
-        }
-      }
-      /* Start trying to bind, giving preferences to longer binding sites. */
-      for (int len = label_ids_by_length.GetSize() - 1; 0 < len; len--) {
-        /*
-        Catalog all possible bindings, searching first by labels of this
-        length, together with their complements; and then by positions of each
-        label and its complement.
-        */
-        std::vector<int> halfbinding_ids;
-        int lbl_ct = label_ids_by_length[len].GetSize();
-        for (int j = 0; j < lbl_ct; j++) {
-          /*
-          Gather info about each possible pairing of a label and its
-          complement.
-          */
-          int lbl_id = label_ids_by_length[len][j];
-          int rvc_id = db.m_label_utils.ReverseComplement(lbl_id);
-          int lbl_position_ct = seq_a->m_lbl_sites[lbl_id].GetSize();
-          int rvc_position_ct = seq_b->m_lbl_sites[rvc_id].GetSize();
-          for (int k = 0; k < lbl_position_ct; k++) {
-            for (int l = 0; l < rvc_position_ct; l++) {
-              cHalfBinding *lbl_hb = db.m_half_bindings.Create();
-              cHalfBinding *rvc_hb = db.m_half_bindings.Create();
-
-              lbl_hb->Set(bbl_id_a, lbl_id, seq_a->m_lbl_sites[lbl_id][k], len, rvc_hb->ID());
-              rvc_hb->Set(bbl_id_b, rvc_id, seq_b->m_lbl_sites[rvc_id][l], len, lbl_hb->ID());
-              halfbinding_ids.push_back(lbl_hb->ID());
-            }
-          }
-        }
-        /* Shuffle binding ids. */
-        std::random_shuffle(halfbinding_ids.begin(), halfbinding_ids.end());
-        /*
-        Randomly select bindings, and discard bindings that won't work because
-        their positions have already been used, or bindings that randomly fail
-        to bind...
-        */
-        /*
-        I chose these probabilities pretty much arbitrarily. For the purposes
-        of brainstorming, I made longer bindings more probable than shorter
-        bindings. But this isn't necessarily how I think binding will
-        eventually work.
-        */
-        double point_binding_probability = 0.5;
-        double binding_probability = 1. - pow(1. - point_binding_probability, len);
-        for (std::vector<int>::iterator it=halfbinding_ids.begin(); it!=halfbinding_ids.end(); ++it) {
-          /* Get the two halves of the binding candidate. */
-          int half_binding_id = *it;
-          cHalfBinding *lbl_hb = db.m_half_bindings.Get(half_binding_id);
-          int other_half_binding_id = lbl_hb->m_other_half_binding_id;
-          cHalfBinding *rvc_hb = db.m_half_bindings.Get(other_half_binding_id);
-          /*
-          Check to see whether the pair can bind -- that is, whether their
-          respective binding positions are available for binding.
-          */
-          bool can_bind = true;
-          for (int j = 0; j < len; j++) {
-            int lbl_chk = lbl_hb->m_lbl_pos + j;
-            int rvc_chk = rvc_hb->m_lbl_pos + j;
-            /*
-            For brainstorming, we're only allowing one binding at a particular
-            point, but code for the class allows more than one binding.
-            */
-            if (bbl_a->m_bindpts.Has(lbl_chk) && (bbl_a->m_bindpts[lbl_chk].GetSize()>0)){
-              can_bind = false;
-            }
-            if (bbl_b->m_bindpts.Has(rvc_chk) && (bbl_b->m_bindpts[rvc_chk].GetSize()>0)){
-              can_bind = false;
-            }
-          }
-          /*
-          Flip a loaded coin to see whether the binding would succeed.
-          */
-          bool does_bind = (rng->GetDouble(0., 1.) < binding_probability);
-          if (can_bind && does_bind) {
-            /* If binding is possible and will succeed, bind! */
-            cout << "  binding: " << db.m_label_utils.ID2Seq(lbl_hb->m_lbl_id) << " (" << lbl_hb->m_lbl_pos << "), " << db.m_label_utils.ID2Seq(rvc_hb->m_lbl_id) << " (" << rvc_hb->m_lbl_pos << ")" << endl;
-            for (int j = 0; j < len; j++) {
-              /* In each molecule, mark all bound positions. */
-              int lbl_chk = lbl_hb->m_lbl_pos + j;
-              int rvc_chk = rvc_hb->m_lbl_pos + j;
-              bbl_a->m_bindpts[lbl_chk].Push(lbl_hb->ID());
-              bbl_b->m_bindpts[rvc_chk].Push(rvc_hb->ID());
-              cout << lbl_hb->m_lbl_pos + j << ":" << rvc_hb->m_lbl_pos + j << endl;
-            }
-          } else {
-            /* Delete failed bindings from database. */
-            db.m_half_bindings.Delete(lbl_hb->ID());
-            db.m_half_bindings.Delete(rvc_hb->ID());
-          }
-        }
-      }
-
-    }
+    /* Molecule collisions. */
+    for (int i=0; i<20; i++) { db.SingleCollision(); }
   }
 
   TEST(IntegratedDynamic, brainstorm_0) {

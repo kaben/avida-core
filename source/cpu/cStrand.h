@@ -43,7 +43,6 @@ class IDs;
 class ObjBase;
 class cBasicLabelUtils;
 class cBindable;
-class cBindsite;
 class cFSM;
 class cFSMDB;
 class cFSMDef;
@@ -238,15 +237,6 @@ public:
   , m_num_nops(num_nops)
   , m_max_label_size(max_label_size)
   {}
-};
-
-
-class cBindsite: public ObjBase {
-public:
-  int m_parent_id;
-  int m_parent_pos;
-  int m_len;
-  int m_other_bindsite_id;
 };
 
 
@@ -476,21 +466,30 @@ public:
 };
 
 
-class cKinetics : public ObjIdx<cBindable> {
+class cKinetics {
 public:
+  Apto::SmartPtr<Apto::RNG::AvidaRNG> m_rng;
+  Apto::Scheduler::ProbabilisticDynamic m_collision_scheduler;
+  ObjIdx<cBindable> m_bindables;
+  ObjIdx<cHalfBinding> m_half_bindings;
+public:
+  cKinetics(Apto::SmartPtr<Apto::RNG::AvidaRNG> rng)
+  : m_rng(rng)
+  , m_collision_scheduler(0, m_rng)
+  {};
 };
 
 class cFSMDB {
 public:
+  Apto::SmartPtr<Apto::RNG::AvidaRNG> m_rng;
+
   cLabelIdx m_lbls;
   cSeqIdx m_seqs;
-  ObjIdx<cBindsite> m_bindsites;
   ObjIdx<cFSMDef> m_fsm_defs;
+
   ObjIdx<cHalfBinding> m_half_bindings;
   ObjIdx<cBindable> m_bindables;
-  //cKinetics m_bindables;
-
-  Apto::SmartPtr<Apto::RNG::AvidaRNG> m_rng;
+  //cKinetics m_kinetics;
   Apto::Scheduler::ProbabilisticDynamic m_collision_scheduler;
 
   cBasicLabelUtils m_label_utils;
@@ -498,10 +497,12 @@ public:
   int CreateStrand(const Apto::String &sequence);
   bool RemoveStrand(int strand_id);
 
-  
+  bool SingleCollision();
+
 public:
   cFSMDB()
   : m_rng(new Apto::RNG::AvidaRNG)
+  //, m_kinetics(m_rng)
   , m_collision_scheduler(0, m_rng)
   {}
 protected:
