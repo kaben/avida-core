@@ -1206,28 +1206,6 @@ namespace nAptoSchedulerDynamicTests {
     //}
   }
 
-  TEST(ProbabilisticDynamic, brainstorm_2) {
-    /* Seed random number generator. */
-    std::srand(0);
-    cFSMDB db;
-    db.m_label_utils.m_max_label_size = 4;
-    /* debruijn sequence with all triplets of a-d. */
-    Apto::String seq_0("aaabaacaadabbabcabdacbaccacdadbadcaddbbbcbbdbccbcdbdcbddcccdcdddaa");
-    Apto::String seq_1("abcdxyzabcdxyzabcd");
-    Apto::SmartPtr<Apto::RNG::AvidaRNG> rng(new Apto::RNG::AvidaRNG);
-
-    /* Load strand molecules into scheduler. */
-    for (int i=0; i<5; i++) { db.CreateStrand(seq_0); }
-    for (int i=0; i<5; i++) { db.CreateStrand(seq_1); }
-
-    /* Molecule collisions. */
-    for (int i=0; i<20; i++) {
-      db.SingleCollision();
-      //db.SingleUnbinding();
-      db.SingleRebinding();
-    }
-  }
-
   TEST(IntegratedDynamic, brainstorm_0) {
     Apto::Scheduler::IntegratedDynamic scheduler(5);
     Apto::Array<int> hits(0);
@@ -1286,7 +1264,7 @@ namespace nAptoSchedulerDynamicTests {
 }
 
 
-namespace nObjDeleteMeIdxTests {
+namespace nObjIdxTests {
   class Feline : public ObjBase {
   public:
     static int s_ct;
@@ -1785,6 +1763,31 @@ namespace nObjDeleteMeIdxTests {
     EXPECT_EQ(0, Feline::s_ct);
     EXPECT_EQ(0, Lion::s_ct);
     EXPECT_EQ(0, Tiger::s_ct);
+  }
+}
+
+
+TEST(Kinetics, collisions_and_unbinding_brainstorm) {
+  /* Seed random number generator. */
+  std::srand(0);
+  cFSMDB db;
+  db.m_label_utils.m_max_label_size = 4;
+  /* debruijn sequence with all triplets of a-d. */
+  Apto::String seq_0("aaabaacaadabbabcabdacbaccacdadbadcaddbbbcbbdbccbcdbdcbddcccdcdddaa");
+  Apto::String seq_1("abcdxyzabcdxyzabcd");
+  Apto::String seq_2("abcdabcdabcd");
+  Apto::SmartPtr<Apto::RNG::AvidaRNG> rng(new Apto::RNG::AvidaRNG);
+
+  /* Load strand molecules into scheduler. */
+  for (int i=0; i<5; i++) { db.CreateStrand(seq_0); }
+  for (int i=0; i<5; i++) { db.CreateStrand(seq_1); }
+  for (int i=0; i<10; i++) { db.CreateStrand(seq_2); }
+
+  /* Molecule collisions. */
+  for (int i=0; i<20; i++) {
+    db.SingleCollision();
+    //db.SingleUnbinding();
+    db.SingleRebinding();
   }
 }
 
