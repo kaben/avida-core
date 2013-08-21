@@ -257,14 +257,6 @@ public:
 };
 
 
-class cFSMDef : public ObjBase {
-public:
-  /* Index by label ID of set of label positions. */
-  Apto::Map<int, Apto::Set<int> > m_lbl_sites;
-  Apto::Set<int> m_fsm_ids;
-};
-
-
 class cHit {
 public:
   int m_id;
@@ -278,46 +270,51 @@ public:
   bool operator!=(const cHit & other) const { return (other.m_id != m_id) || (other.m_pos != m_pos); }
 };
 
-
 class cLabel : public ObjBase {
 public:
   Apto::Set<int> m_seq_ids;
   Apto::Set<int> m_fsm_def_ids;
 };
 
-
-class cSequence : public ObjBase {
+class cLabeled : public ObjBase {
 public:
-  /* Index by label ID of set of label positions. */
-  //Apto::Map<int, Apto::Set<int> > m_lbl_sites;
-  Apto::Map<int, Apto::Array<int> > m_lbl_sites;
+  /* Index by label ID of label positions. */
+  Apto::Map<int, Apto::Array<int> > m_labels;
+};
+
+class cSequence : public cLabeled {
+public:
   Apto::Set<int> m_strand_ids;
 };
 
+class cFSMDef : public cLabeled {
+public:
+  Apto::Set<int> m_fsm_ids;
+};
 
 class cBindable: public ObjBase {
 public:
   /* Index by position of bindsites. */
-  Apto::Map<int, Apto::Array<int> > m_bindpts;
+  Apto::Map<int, Apto::Set<int> > m_bindpts;
 public:
   virtual ~cBindable(){}
+  virtual Apto::Map<int, Apto::Array<int> > &GetLabels(cFSMDB &db) = 0;
+  virtual Apto::String AsString(cFSMDB &db) = 0;
 };
-
-
-class cFSM : public cBindable {
-public:
-  int m_fsm_def_id;
-  Apto::Set<int> m_bindsite_ids;
-};
-
 
 class cStrand : public cBindable {
 public:
   int m_seq_id;
-  Apto::Set<int> m_bindsite_ids;
-  Apto::Map<int, Apto::Set<int> > m_bnd_sites;
+  virtual Apto::Map<int, Apto::Array<int> > &GetLabels(cFSMDB &db);
+  virtual Apto::String AsString(cFSMDB &db);
 };
 
+class cFSM : public cBindable {
+public:
+  int m_fsm_def_id;
+  virtual Apto::Map<int, Apto::Array<int> > &GetLabels(cFSMDB &db);
+  virtual Apto::String AsString(cFSMDB &db);
+};
 
 template <class T>
 class ObjIdx : public IDMgr {
@@ -327,9 +324,7 @@ public:
   class Iterator;
   friend class Iterator;
 public:
-  ~ObjIdx() {
-    for (Iterator it = Begin(); it.Next();) { Delete(it.ID()); }
-  }
+  ~ObjIdx() { for (Iterator it = Begin(); it.Next();) { Delete(it.ID()); } }
 public:
   /*
   This is a polymorphic factory function using the default constructor for U.
@@ -491,6 +486,7 @@ public:
   ObjIdx<cBindable> m_bindables;
   //cKinetics m_kinetics;
   Apto::Scheduler::ProbabilisticDynamic m_collision_scheduler;
+  Apto::Scheduler::IntegratedDynamic m_unbinding_scheduler;
 
   cBasicLabelUtils m_label_utils;
 
@@ -498,12 +494,17 @@ public:
   bool RemoveStrand(int strand_id);
 
   bool SingleCollision();
+  bool Collide(int bindable_id_0, int bindable_id_1);
+  bool SingleUnbinding();
+  bool Unbind(int half_binding_id);
+  bool SingleRebinding();
 
 public:
   cFSMDB()
   : m_rng(new Apto::RNG::AvidaRNG)
   //, m_kinetics(m_rng)
   , m_collision_scheduler(0, m_rng)
+  , m_unbinding_scheduler(0)
   {}
 protected:
   int InsertSequence(const Apto::String &sequence);

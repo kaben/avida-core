@@ -35,6 +35,12 @@ using namespace std;
 
 
 /*
+BOOKMARK 20130821-1141
+- Need to be able to determine a bindable object's labels. Current bindables
+  include strands and FSMs. Strands have sequences, which in turn have labels.
+  FSMs have models, which in turn have labels.
+- I could make a virtual Map<int, Array<int> > &cBindable::GetLabelSites(cFSMDB
+  &db) function that returns a bindable object's labels.
 BOOKMARK 20130819-2217
 - Possible solution to need for overlapping bindings implemented by changing
   cBindable::m_bindpts from Map<int, int> to Map<int, Array<int> >. Thus each
@@ -104,21 +110,21 @@ Next steps:
 //class cSequence {
 //public:
 //  Apto::String m_str;
-//  Apto::Map<int, Apto::Set<int> > m_lbl_sites;
+//  Apto::Map<int, Apto::Set<int> > m_labels;
 //  typedef typename Apto::Map<int, Apto::Set<int> >::KeyIterator LabelIter;
 //  typedef typename Apto::Set<int>::Iterator PositionIter;
 //public:
 //  cSequence()
 //  {}
 //public:
-//  void InsertLabelPos(int lbl_id, int lbl_pos) { m_lbl_sites[lbl_id].Insert(lbl_pos); }
-//  bool GetLabelHitCt(int lbl_id) { return m_lbl_sites[lbl_id].GetSize(); }
-//  bool HasLabel(int lbl_id) { return m_lbl_sites.Has(lbl_id); }
-//  bool RemoveLabelPos(int lbl_id, int lbl_pos) { return m_lbl_sites[lbl_id].Remove(lbl_pos); }
-//  bool RemoveLabel(int lbl_id) { return m_lbl_sites.Remove(lbl_id); }
+//  void InsertLabelPos(int lbl_id, int lbl_pos) { m_labels[lbl_id].Insert(lbl_pos); }
+//  bool GetLabelHitCt(int lbl_id) { return m_labels[lbl_id].GetSize(); }
+//  bool HasLabel(int lbl_id) { return m_labels.Has(lbl_id); }
+//  bool RemoveLabelPos(int lbl_id, int lbl_pos) { return m_labels[lbl_id].Remove(lbl_pos); }
+//  bool RemoveLabel(int lbl_id) { return m_labels.Remove(lbl_id); }
 //  Apto::String GetString() { return m_str; }
-//  LabelIter Labels() { return m_lbl_sites.Keys(); }
-//  PositionIter Positions(int label_id) { return m_lbl_sites[label_id].Begin(); }
+//  LabelIter Labels() { return m_labels.Keys(); }
+//  PositionIter Positions(int label_id) { return m_labels[label_id].Begin(); }
 //};
 //
 //class cLabel {
@@ -367,7 +373,7 @@ cFSMdb owns all objects, and each object has an ID.
 //      if (LabelRefCt(lbl_ptr) < 1) { RemoveLabel(lbl_ptr); }
 //    }
 //    /* Do this instead of deleting while iterating. */
-//    seq_ptr->m_lbl_sites.Clear();
+//    seq_ptr->m_labels.Clear();
 //  }
 //}
 //
@@ -824,126 +830,126 @@ namespace nFSMDBTests {
     EXPECT_EQ(seq_id_0, db.InsertSequence(seq_0));
   
     /* Verify stored label info in sequence and label objects. */
-    EXPECT_EQ(9, seq_ptr_0->m_lbl_sites.GetSize());
+    EXPECT_EQ(9, seq_ptr_0->m_labels.GetSize());
     int lbl_id = -1;
     int lbl_pos = -1;
     //Apto::SmartPtr<cLabel> lbl_ptr;
     cLabel* lbl_ptr;
-    //Apto::Map<int, Apto::Set<int> >::KeyIterator lbl_it = seq_ptr_0->m_lbl_sites.Keys();  
-    Apto::Map<int, Apto::Array<int> >::KeyIterator lbl_it = seq_ptr_0->m_lbl_sites.Keys();  
+    //Apto::Map<int, Apto::Set<int> >::KeyIterator lbl_it = seq_ptr_0->m_labels.Keys();  
+    Apto::Map<int, Apto::Array<int> >::KeyIterator lbl_it = seq_ptr_0->m_labels.Keys();  
   
     lbl_it.Next(); lbl_id = *lbl_it.Get(); lbl_ptr = db.m_lbls.Get(lbl_id); 
     EXPECT_EQ(db.m_label_utils.Seq2ID("a"), lbl_id);
-    EXPECT_EQ(3, seq_ptr_0->m_lbl_sites[lbl_id].GetSize());
+    EXPECT_EQ(3, seq_ptr_0->m_labels[lbl_id].GetSize());
     EXPECT_EQ(1, lbl_ptr->m_seq_ids.GetSize());
     EXPECT_TRUE(lbl_ptr->m_seq_ids.Has(seq_id_0));
-    //Apto::Set<int>::Iterator pos_it = seq_ptr_0->m_lbl_sites[lbl_id].Begin(); {
+    //Apto::Set<int>::Iterator pos_it = seq_ptr_0->m_labels[lbl_id].Begin(); {
     {
-      Apto::Array<int>::Iterator pos_it = seq_ptr_0->m_lbl_sites[lbl_id].Begin();
+      Apto::Array<int>::Iterator pos_it = seq_ptr_0->m_labels[lbl_id].Begin();
       pos_it.Next(); EXPECT_EQ(0, *pos_it.Get());
       pos_it.Next(); EXPECT_EQ(7, *pos_it.Get());
       pos_it.Next(); EXPECT_EQ(14, *pos_it.Get());
     }
     lbl_it.Next(); lbl_id = *lbl_it.Get(); lbl_ptr = db.m_lbls.Get(lbl_id); 
     EXPECT_EQ(db.m_label_utils.Seq2ID("b"), lbl_id);
-    EXPECT_EQ(3, seq_ptr_0->m_lbl_sites[lbl_id].GetSize());
+    EXPECT_EQ(3, seq_ptr_0->m_labels[lbl_id].GetSize());
     EXPECT_EQ(1, lbl_ptr->m_seq_ids.GetSize());
     EXPECT_TRUE(lbl_ptr->m_seq_ids.Has(seq_id_0));
     {
-      Apto::Array<int>::Iterator pos_it = seq_ptr_0->m_lbl_sites[lbl_id].Begin();
+      Apto::Array<int>::Iterator pos_it = seq_ptr_0->m_labels[lbl_id].Begin();
       pos_it.Next(); EXPECT_EQ(1, *pos_it.Get());
       pos_it.Next(); EXPECT_EQ(8, *pos_it.Get());
       pos_it.Next(); EXPECT_EQ(15, *pos_it.Get());
     }
     lbl_it.Next(); lbl_id = *lbl_it.Get(); lbl_ptr = db.m_lbls.Get(lbl_id); 
     EXPECT_EQ(db.m_label_utils.Seq2ID("bcd"), lbl_id);
-    EXPECT_EQ(3, seq_ptr_0->m_lbl_sites[lbl_id].GetSize());
+    EXPECT_EQ(3, seq_ptr_0->m_labels[lbl_id].GetSize());
     EXPECT_EQ(1, lbl_ptr->m_seq_ids.GetSize());
     EXPECT_TRUE(lbl_ptr->m_seq_ids.Has(seq_id_0));
     {
-      Apto::Array<int>::Iterator pos_it = seq_ptr_0->m_lbl_sites[lbl_id].Begin();
+      Apto::Array<int>::Iterator pos_it = seq_ptr_0->m_labels[lbl_id].Begin();
       pos_it.Next(); EXPECT_EQ(1, *pos_it.Get());
       pos_it.Next(); EXPECT_EQ(8, *pos_it.Get());
       pos_it.Next(); EXPECT_EQ(15, *pos_it.Get());
     }
     lbl_it.Next(); lbl_id = *lbl_it.Get(); lbl_ptr = db.m_lbls.Get(lbl_id); 
     EXPECT_EQ(db.m_label_utils.Seq2ID("c"), lbl_id);
-    EXPECT_EQ(3, seq_ptr_0->m_lbl_sites[lbl_id].GetSize());
+    EXPECT_EQ(3, seq_ptr_0->m_labels[lbl_id].GetSize());
     EXPECT_EQ(1, lbl_ptr->m_seq_ids.GetSize());
     EXPECT_TRUE(lbl_ptr->m_seq_ids.Has(seq_id_0));
     {
-      Apto::Array<int>::Iterator pos_it = seq_ptr_0->m_lbl_sites[lbl_id].Begin();
+      Apto::Array<int>::Iterator pos_it = seq_ptr_0->m_labels[lbl_id].Begin();
       pos_it.Next(); EXPECT_EQ(2, *pos_it.Get());
       pos_it.Next(); EXPECT_EQ(9, *pos_it.Get());
       pos_it.Next(); EXPECT_EQ(16, *pos_it.Get());
     }
     lbl_it.Next(); lbl_id = *lbl_it.Get(); lbl_ptr = db.m_lbls.Get(lbl_id); 
     EXPECT_EQ(db.m_label_utils.Seq2ID("abc"), lbl_id);
-    EXPECT_EQ(3, seq_ptr_0->m_lbl_sites[lbl_id].GetSize());
+    EXPECT_EQ(3, seq_ptr_0->m_labels[lbl_id].GetSize());
     EXPECT_EQ(1, lbl_ptr->m_seq_ids.GetSize());
     EXPECT_TRUE(lbl_ptr->m_seq_ids.Has(seq_id_0));
     {
-      Apto::Array<int>::Iterator pos_it = seq_ptr_0->m_lbl_sites[lbl_id].Begin();
+      Apto::Array<int>::Iterator pos_it = seq_ptr_0->m_labels[lbl_id].Begin();
       pos_it.Next(); EXPECT_EQ(0, *pos_it.Get());
       pos_it.Next(); EXPECT_EQ(7, *pos_it.Get());
       pos_it.Next(); EXPECT_EQ(14, *pos_it.Get());
     }
     lbl_it.Next(); lbl_id = *lbl_it.Get(); lbl_ptr = db.m_lbls.Get(lbl_id); 
     EXPECT_EQ(db.m_label_utils.Seq2ID("d"), lbl_id);
-    EXPECT_EQ(3, seq_ptr_0->m_lbl_sites[lbl_id].GetSize());
+    EXPECT_EQ(3, seq_ptr_0->m_labels[lbl_id].GetSize());
     EXPECT_EQ(1, lbl_ptr->m_seq_ids.GetSize());
     EXPECT_TRUE(lbl_ptr->m_seq_ids.Has(seq_id_0));
     {
-      Apto::Array<int>::Iterator pos_it = seq_ptr_0->m_lbl_sites[lbl_id].Begin();
+      Apto::Array<int>::Iterator pos_it = seq_ptr_0->m_labels[lbl_id].Begin();
       pos_it.Next(); EXPECT_EQ(3, *pos_it.Get());
       pos_it.Next(); EXPECT_EQ(10, *pos_it.Get());
       pos_it.Next(); EXPECT_EQ(17, *pos_it.Get());
     }
     lbl_it.Next(); lbl_id = *lbl_it.Get(); lbl_ptr = db.m_lbls.Get(lbl_id); 
     EXPECT_EQ(db.m_label_utils.Seq2ID("ab"), lbl_id);
-    EXPECT_EQ(3, seq_ptr_0->m_lbl_sites[lbl_id].GetSize());
+    EXPECT_EQ(3, seq_ptr_0->m_labels[lbl_id].GetSize());
     EXPECT_EQ(1, lbl_ptr->m_seq_ids.GetSize());
     EXPECT_TRUE(lbl_ptr->m_seq_ids.Has(seq_id_0));
     {
-      Apto::Array<int>::Iterator pos_it = seq_ptr_0->m_lbl_sites[lbl_id].Begin();
+      Apto::Array<int>::Iterator pos_it = seq_ptr_0->m_labels[lbl_id].Begin();
       pos_it.Next(); EXPECT_EQ(0, *pos_it.Get());
       pos_it.Next(); EXPECT_EQ(7, *pos_it.Get());
       pos_it.Next(); EXPECT_EQ(14, *pos_it.Get());
     }
     lbl_it.Next(); lbl_id = *lbl_it.Get(); lbl_ptr = db.m_lbls.Get(lbl_id); 
     EXPECT_EQ(db.m_label_utils.Seq2ID("bc"), lbl_id);
-    EXPECT_EQ(3, seq_ptr_0->m_lbl_sites[lbl_id].GetSize());
+    EXPECT_EQ(3, seq_ptr_0->m_labels[lbl_id].GetSize());
     EXPECT_EQ(1, lbl_ptr->m_seq_ids.GetSize());
     EXPECT_TRUE(lbl_ptr->m_seq_ids.Has(seq_id_0));
     {
-      Apto::Array<int>::Iterator pos_it = seq_ptr_0->m_lbl_sites[lbl_id].Begin();
+      Apto::Array<int>::Iterator pos_it = seq_ptr_0->m_labels[lbl_id].Begin();
       pos_it.Next(); EXPECT_EQ(1, *pos_it.Get());
       pos_it.Next(); EXPECT_EQ(8, *pos_it.Get());
       pos_it.Next(); EXPECT_EQ(15, *pos_it.Get());
     }
     lbl_it.Next(); lbl_id = *lbl_it.Get(); lbl_ptr = db.m_lbls.Get(lbl_id); 
     EXPECT_EQ(db.m_label_utils.Seq2ID("cd"), lbl_id);
-    EXPECT_EQ(3, seq_ptr_0->m_lbl_sites[lbl_id].GetSize());
+    EXPECT_EQ(3, seq_ptr_0->m_labels[lbl_id].GetSize());
     EXPECT_EQ(1, lbl_ptr->m_seq_ids.GetSize());
     EXPECT_TRUE(lbl_ptr->m_seq_ids.Has(seq_id_0));
     {
-      Apto::Array<int>::Iterator pos_it = seq_ptr_0->m_lbl_sites[lbl_id].Begin();
+      Apto::Array<int>::Iterator pos_it = seq_ptr_0->m_labels[lbl_id].Begin();
       pos_it.Next(); EXPECT_EQ(2, *pos_it.Get());
       pos_it.Next(); EXPECT_EQ(9, *pos_it.Get());
       pos_it.Next(); EXPECT_EQ(16, *pos_it.Get());
     }
   
     /* To help regenerate the above: */
-    //for (Apto::Map<int, Apto::Array<int> >::KeyIterator lbl_it = seq_ptr_0->m_lbl_sites.Keys(); lbl_it.Next();) {
+    //for (Apto::Map<int, Apto::Array<int> >::KeyIterator lbl_it = seq_ptr_0->m_labels.Keys(); lbl_it.Next();) {
     //  int lbl_id = *lbl_it.Get();
     //  cout << "lbl_it.Next(); lbl_id = *lbl_it.Get(); lbl_ptr = db.m_lbls.Get(lbl_id);" << endl;
     //  cout << "EXPECT_EQ(db.m_label_utils.Seq2ID(\"" << db.m_label_utils.ID2Seq(lbl_id) << "\"), lbl_id);" << endl;
-    //  cout << "EXPECT_EQ(" << seq_ptr_0->m_lbl_sites[lbl_id].GetSize() << ", seq_ptr_0->m_lbl_sites[lbl_id].GetSize());" << endl;
+    //  cout << "EXPECT_EQ(" << seq_ptr_0->m_labels[lbl_id].GetSize() << ", seq_ptr_0->m_labels[lbl_id].GetSize());" << endl;
     //  cout << "EXPECT_EQ(" << lbl_ptr->m_seq_ids.GetSize() << ", lbl_ptr->m_seq_ids.GetSize());" << endl;
     //  cout << "EXPECT_TRUE(lbl_ptr->m_seq_ids.Has(seq_id_0));" << endl;
     //  cout << "{" << endl;
-    //  cout << "  Apto::Array<int>::Iterator pos_it = seq_ptr_0->m_lbl_sites[lbl_id].Begin(); {" << endl;
-    //  for (Apto::Array<int>::Iterator pos_it = seq_ptr_0->m_lbl_sites[lbl_id].Begin(); pos_it.Next();) {
+    //  cout << "  Apto::Array<int>::Iterator pos_it = seq_ptr_0->m_labels[lbl_id].Begin(); {" << endl;
+    //  for (Apto::Array<int>::Iterator pos_it = seq_ptr_0->m_labels[lbl_id].Begin(); pos_it.Next();) {
     //    int lbl_pos = *pos_it.Get();
     //    cout << "  pos_it.Next(); EXPECT_EQ(" << lbl_pos << ", *pos_it.Get());" << endl;
     //  }
@@ -1215,7 +1221,11 @@ namespace nAptoSchedulerDynamicTests {
     for (int i=0; i<5; i++) { db.CreateStrand(seq_1); }
 
     /* Molecule collisions. */
-    for (int i=0; i<20; i++) { db.SingleCollision(); }
+    for (int i=0; i<20; i++) {
+      db.SingleCollision();
+      //db.SingleUnbinding();
+      db.SingleRebinding();
+    }
   }
 
   TEST(IntegratedDynamic, brainstorm_0) {
