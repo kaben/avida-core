@@ -441,6 +441,24 @@ Apto::String cFSM::AsString(cFSMDB &db) {
   return "";
 }
 
+int cNFA::Transition(int symbol_id, cFSMDB &db) {
+  cNFADef *nfa_def = db.m_fsm_defs.Get<cNFADef>(m_fsm_def_id);
+  cout << "symbol_id: " << symbol_id << ", current m_state_id: " << m_state_id;
+  if ((nfa_def != NULL) && nfa_def->m_transition_relation.Has(m_state_id) && nfa_def->m_transition_relation[m_state_id].Has(symbol_id)) {
+    int num_states = nfa_def->m_transition_relation[m_state_id][symbol_id].GetSize();
+    if (1 < num_states) {
+      cout << ", num_states: " << num_states;
+      int next_state_idx = m_rng->GetInt(0, num_states);
+      cout << ", next_state_idx: " << next_state_idx;
+      m_state_id = nfa_def->m_transition_relation[m_state_id][symbol_id][next_state_idx];
+    } else {
+      m_state_id = nfa_def->m_transition_relation[m_state_id][symbol_id][0];
+    }
+  } else {
+  }
+  cout << ", next m_state_id: " << m_state_id << endl;
+  return m_state_id;
+}
 
 bool cLabelIdx::Has(int id) { return m_id2idx.Has(id); }
 cLabel* cLabelIdx::Get(int id) { return (Has(id))?(m_objs[m_id2idx[id]]):((cLabel*)(0)); }
@@ -579,6 +597,11 @@ bool cFSMDB::RemoveStrand(int strand_id) {
     return m_bindables.Delete(strand_id);
   } else { return false; }
 }
+int cFSMDB::CreateFSMBootstrap() {
+  cFSMBootstrap* ptr = m_bindables.Create<cFSMBootstrap>();
+  int id = ptr->ID();
+  return 0;
+}
 bool cFSMDB::SingleCollision() {
   /* Get two molecules to collide. */
   int bindable_id_0 = m_collision_scheduler.Next();
@@ -664,8 +687,12 @@ bool cFSMDB::Collide(int bbl_id_0, int bbl_id_1) {
     of brainstorming, I made longer bindings more probable than shorter
     bindings. But this isn't necessarily how I think binding will
     eventually work.
+
+    Update: switched point binding probability to 0.10910128185966073, so
+    probability of 6-point binding is about 0.5 (or
+    1-(1-0.10910128185966073)**6). (Computed as 1-math.exp(math.log(0.5)/6.).)
     */
-    double point_binding_probability = 0.10;
+    double point_binding_probability = 0.10910128185966073;
     double binding_probability = 1. - pow(1. - point_binding_probability, len);
     for (std::vector<int>::iterator it=halfbinding_ids.begin(); it!=halfbinding_ids.end(); ++it) {
       /* Get the two halves of the binding candidate. */
@@ -684,13 +711,21 @@ bool cFSMDB::Collide(int bbl_id_0, int bbl_id_1) {
         /*
         For brainstorming, we're only allowing one binding at a particular
         point, but code for the class allows more than one binding.
+
+        I think that whether to allow more than one binding depends upon the
+        reactants; but that most of the time only one binding would be allowed.
+        An exception could be needed if, for example, we want certain molecules
+        to be able to catalyze an unbinding reaction, in which case the
+        catalyst would bind to an already-bound position, and then the double
+        binding would immediately completely unbind.
+
+        Giving a precise quantitative description of this kind of reaction will
+        be easier once we have chemical kinetics.
         */
         if (bbl_a->m_bindpts.Has(lbl_chk) && (bbl_a->m_bindpts[lbl_chk].GetSize()>0)){ can_bind = false; }
         if (bbl_b->m_bindpts.Has(rvc_chk) && (bbl_b->m_bindpts[rvc_chk].GetSize()>0)){ can_bind = false; }
       }
-      /*
-      Flip a loaded coin to see whether the binding would succeed.
-      */
+      /* Flip a loaded coin to see whether the binding would succeed. */
       bool does_bind = (m_rng->GetDouble(0., 1.) < binding_probability);
       if (can_bind && does_bind) {
         /* If binding is possible and will succeed, bind! */
@@ -728,7 +763,18 @@ bool cFSMDB::Unbind(int lbl_hb_id) {
   cHalfBinding *lbl_hb = m_half_bindings.Get(lbl_hb_id);
   int rvc_hb_id = lbl_hb->m_other_half_binding_id;
   cHalfBinding *rvc_hb = m_half_bindings.Get(rvc_hb_id);
-  double point_binding_probability = 0.10;
+  /*
+  TODO: establish probability distributions for bindings.
+
+  I chose these probabilities pretty much arbitrarily. For the purposes of
+  brainstorming, I made longer bindings more probable than shorter bindings.
+  But this isn't necessarily how I think binding will eventually work.
+
+  Update: switched point binding probability to 0.10910128185966073, so
+  probability of 6-point binding is about 0.5 (or
+  1-(1-0.10910128185966073)**6).
+  */
+  double point_binding_probability = 0.10910128185966073;
   double unbinding_probability = pow(1. - point_binding_probability, lbl_hb->m_lbl_len);
   bool does_unbind = (m_rng->GetDouble(0., 1.) < unbinding_probability);
   if (does_unbind) {

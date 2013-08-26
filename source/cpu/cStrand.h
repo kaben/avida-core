@@ -27,6 +27,7 @@
 #include "cCPUMemory.h"
 #include "avida/core/InstructionSequence.h"
 #include "apto/core/Array.h"
+#include "apto/core/Functor.h"
 #include "apto/core/Map.h"
 #include "apto/core/PriorityScheduler.h"
 #include "apto/core/PriorityScheduler.h"
@@ -280,6 +281,8 @@ class cLabeled : public ObjBase {
 public:
   /* Index by label ID of label positions. */
   Apto::Map<int, Apto::Array<int> > m_labels;
+public:
+  virtual ~cLabeled(){}
 };
 
 class cSequence : public cLabeled {
@@ -290,6 +293,43 @@ public:
 class cFSMDef : public cLabeled {
 public:
   Apto::Set<int> m_fsm_ids;
+public:
+  virtual ~cFSMDef(){}
+};
+
+class cFunction {
+public:
+};
+
+class cFSMBootstrapDef : public cFSMDef {
+public:
+};
+
+class cNFADef : public cFSMDef {
+public:
+  /* int next_state_id = m_transition_relation[state_id][symbol_id][next_state_idx]; */
+  /*
+  int state_id;
+  int symbol_id;
+  if (m_transition_relation.Has(state_id) && m_transition_relation[state_id].Has(symbol_id)) {
+    int num_states = m_transition_relation[state_id][symbol_id].GetSize();
+    int next_state_idx = random.GetInt(0, num_states - 1);
+    int next_state_id = m_transition_relation[state_id][symbol_id][next_state_idx];
+  } else {
+  }
+  */
+  Apto::Map<int, Apto::Map<int, Apto::Array<int> > > m_transition_relation;
+  /* int function_id = m_function_relation[state_id][function_idx]; */
+  /*
+  int state_id;
+  if (m_function_relation.Has(state_id)) {
+    int num_functions = m_function_relation[state_id].GetSize();
+    int function_idx = random.GetInt(0, num_functions - 1);
+    int function_id = m_function_relation[state_id][function_idx];
+  } else {
+  }
+  */
+  Apto::Map<int, Apto::Array<int> > m_function_relation;
 };
 
 class cBindable: public ObjBase {
@@ -314,6 +354,18 @@ public:
   int m_fsm_def_id;
   virtual Apto::Map<int, Apto::Array<int> > &GetLabels(cFSMDB &db);
   virtual Apto::String AsString(cFSMDB &db);
+};
+
+class cFSMBootstrap : public cFSM {
+public:
+};
+
+class cNFA : public cFSM {
+public:
+  int m_state_id;
+  Apto::SmartPtr<Apto::RNG::AvidaRNG> m_rng;
+public:
+  int Transition(int symbol_id, cFSMDB &db);
 };
 
 template <class T>
@@ -421,6 +473,13 @@ protected:
   Apto::Map<Apto::String, int> m_str2id;
   Apto::Map<int, Apto::String> m_id2str;
 public:
+  ~cSeqIdx() {
+    /* FIXME: cleanup. */
+    //Apto::Array<int, Apto::Smart> ids;
+    //for (Apto::Map<int, Apto::String>::KeyIterator it = m_id2str.Keys(); it.Next();) { ids.Push(*it.Get()); }
+    //for (int i=0; i<ids.GetSize(); i++){ Delete(ids[i]); }
+  }
+public:
   bool Has(int id);
   bool Has(const Apto::String &str);
   cSequence* Get(int id);
@@ -439,6 +498,13 @@ public:
 protected:
   Apto::Array<cLabel*, Apto::Smart> m_objs;
   Apto::Map<int, int> m_id2idx;
+public:
+  ~cLabelIdx() {
+    /* FIXME: cleanup. */
+    //Apto::Array<int, Apto::Smart> ids;
+    //for (Iterator it = Begin(); it.Next();) { ids.Push(it.ID()); }
+    //for (int i=0; i<ids.GetSize(); i++){ Delete(ids[i]); }
+  }
 public:
   bool Has(int id);
   cLabel* Get(int id);
@@ -492,6 +558,8 @@ public:
 
   int CreateStrand(const Apto::String &sequence);
   bool RemoveStrand(int strand_id);
+
+  int CreateFSMBootstrap();
 
   bool SingleCollision();
   bool Collide(int bindable_id_0, int bindable_id_1);

@@ -35,6 +35,25 @@ using namespace std;
 
 
 /*
+BOOKMARK 20130825-2236
+- Working on test NFA.brainstorm. I've implemented a basic NFADef and NFA with
+  a transition relation, and I've exercised it in the brainstorm test. Now I'm
+  working on the function relation. It looks like the Apto::Functor<> class
+  will work well for this purpose. Now I've got to figure out what the functors
+  will do, what arguments they should take, and what they should return. I
+  think they should take the ID of the current FSM as their sole argument, and
+  they should perhaps be functors bound to the cFSMDB object. They'll need to
+  call the FSM polymorphically, if at all, which suggests I should consider
+  adding to the basic FSM interface. But this can be deferred for now; I should
+  spend my current effort sketching the system out. So next step would be to
+  make a set of dumb functors.
+BOOKMARK 20130821-2238
+- Working on cFSMBootstrapDef, cFSMBootstrap, and int
+  cFSMDB::CreateFSMBootstrap(). This will become the FSM that bootstraps the
+  CPU by reading the genome strand for specs to produce initial non-bootstrap
+  FSMs. I imagine the bootstrap FSM could be deleted; but it will more probably
+  remain in use. More than one can be created, even. Perhaps it is initially
+  created if there are no other FSMs present.
 BOOKMARK 20130821-1141
 - Need to be able to determine a bindable object's labels. Current bindables
   include strands and FSMs. Strands have sequences, which in turn have labels.
@@ -1100,12 +1119,30 @@ namespace nBasicLabelUtilsTests {
     EXPECT_EQ(u.Seq2ID("cdab"), new_id);
   }
 
+  TEST(cBasicLabelUtils, Rotate_long_label) {
+    cBasicLabelUtils u;
+    u.m_max_label_size = 6;
+    int id = u.Seq2ID("acacaa");
+    int new_id = u.Rotate(id);
+    EXPECT_EQ(u.Seq2ID("acacaa"), id);
+    EXPECT_EQ(u.Seq2ID("cacacc"), new_id);
+  }
+
   TEST(cBasicLabelUtils, ReverseComplement) {
     cBasicLabelUtils u;
     int id = u.Seq2ID("abcd");
     int new_id = u.ReverseComplement(id);
     EXPECT_EQ(u.Seq2ID("abcd"), id);
     EXPECT_EQ(u.Seq2ID("badc"), new_id);
+  }
+
+  TEST(cBasicLabelUtils, ReverseComplement_long_label) {
+    cBasicLabelUtils u;
+    u.m_max_label_size = 6;
+    int id = u.Seq2ID("acacaa");
+    int new_id = u.ReverseComplement(id);
+    EXPECT_EQ(u.Seq2ID("acacaa"), id);
+    EXPECT_EQ(u.Seq2ID("ccacac"), new_id);
   }
 }
 
@@ -1771,17 +1808,19 @@ TEST(Kinetics, collisions_and_unbinding_brainstorm) {
   /* Seed random number generator. */
   std::srand(0);
   cFSMDB db;
-  db.m_label_utils.m_max_label_size = 4;
+  db.m_label_utils.m_max_label_size = 6;
   /* debruijn sequence with all triplets of a-d. */
-  Apto::String seq_0("aaabaacaadabbabcabdacbaccacdadbadcaddbbbcbbdbccbcdbdcbddcccdcdddaa");
-  Apto::String seq_1("abcdxyzabcdxyzabcd");
-  Apto::String seq_2("abcdabcdabcd");
+  Apto::String seq_0("aaabaacaadabbabcabdacbaccacdadbadcaddbbbcbbdbccbcdbdcbddcccdcdddaaccacac");
+  Apto::String seq_1("acacaaabaacaadabbabcabdacbaccacdadbadcaddbbbcbbdbccbcdbdcbddcccdcdddaa");
+  Apto::String seq_2("abcdxyzabcdxyzabcd");
+  Apto::String seq_3("abcdabcdabcdadadaa");
   Apto::SmartPtr<Apto::RNG::AvidaRNG> rng(new Apto::RNG::AvidaRNG);
 
   /* Load strand molecules into scheduler. */
   for (int i=0; i<5; i++) { db.CreateStrand(seq_0); }
   for (int i=0; i<5; i++) { db.CreateStrand(seq_1); }
   for (int i=0; i<10; i++) { db.CreateStrand(seq_2); }
+  for (int i=0; i<10; i++) { db.CreateStrand(seq_3); }
 
   /* Molecule collisions. */
   for (int i=0; i<20; i++) {
@@ -1789,6 +1828,59 @@ TEST(Kinetics, collisions_and_unbinding_brainstorm) {
     //db.SingleUnbinding();
     db.SingleRebinding();
   }
+}
+
+TEST(NFA, brainstorm) {
+  cFSMDB db;
+  /*
+  For now, hardwire an NFADef, then instantiate an NFA using the def, then test
+  the NFA. Later, brainstorm and test various encodings.
+  */
+  /* Instantiate NFADef. */
+  cNFADef *nfa_def = db.m_fsm_defs.Create<cNFADef>();
+  /* Hardwire transitions. */
+  nfa_def->m_transition_relation[0]['a'].Push(1);
+  nfa_def->m_transition_relation[0]['b'].Push(2);
+  nfa_def->m_transition_relation[0]['b'].Push(3);
+  nfa_def->m_transition_relation[0]['c'].Push(4);
+  nfa_def->m_transition_relation[1]['a'].Push(0);
+  nfa_def->m_transition_relation[1]['b'].Push(2);
+  nfa_def->m_transition_relation[1]['b'].Push(3);
+  nfa_def->m_transition_relation[1]['c'].Push(4);
+  nfa_def->m_transition_relation[2]['a'].Push(0);
+  nfa_def->m_transition_relation[2]['b'].Push(3);
+  nfa_def->m_transition_relation[2]['c'].Push(4);
+  nfa_def->m_transition_relation[3]['a'].Push(0);
+  nfa_def->m_transition_relation[3]['b'].Push(2);
+  nfa_def->m_transition_relation[3]['c'].Push(4);
+  nfa_def->m_transition_relation[4]['a'].Push(0);
+  //nfa_def->m_transition_relation[4]['b'];
+  //nfa_def->m_transition_relation[4]['c'];
+  /* Instantiate NFA using the NFADef. */
+  cNFA *nfa = db.m_bindables.Create<cNFA>();
+  nfa->m_rng = db.m_rng;
+  nfa->m_fsm_def_id = nfa_def->ID();
+  nfa->m_state_id = 0;
+  /* Test the NFA. */
+  cout << "Transition('a'): " << nfa->Transition('a', db) << endl;
+  cout << "Transition('b'): " << nfa->Transition('b', db) << endl;
+  cout << "Transition('c'): " << nfa->Transition('c', db) << endl;
+  cout << "Transition('b'): " << nfa->Transition('b', db) << endl;
+  cout << "Transition('c'): " << nfa->Transition('c', db) << endl;
+  cout << "Transition('d'): " << nfa->Transition('d', db) << endl;
+  cout << "Transition('a'): " << nfa->Transition('a', db) << endl;
+  cout << "Transition('b'): " << nfa->Transition('b', db) << endl;
+  cout << "Transition('a'): " << nfa->Transition('a', db) << endl;
+  cout << "Transition('b'): " << nfa->Transition('b', db) << endl;
+  cout << "Transition('a'): " << nfa->Transition('a', db) << endl;
+  cout << "Transition('b'): " << nfa->Transition('b', db) << endl;
+  cout << "Transition('a'): " << nfa->Transition('a', db) << endl;
+  /* Figure out how function calls will work. */
+  /* Now hardwire some functions. */
+  /* Test in the NFA. */
+  /* Brainstorm some encodings. Test each. */
+  /* Cleanup. */
+  db.m_fsm_defs.Delete(nfa_def->ID());
 }
 
 
