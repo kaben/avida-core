@@ -35,6 +35,45 @@ using namespace std;
 
 
 /*
+BOOKMARK 20130827-1256
+- Some operations an FSM can perform:
+  - lysing.
+    - after head.
+    - before head.
+    - before and after head.
+  - deletion.
+    - delete at head, and lyse before and after head.
+    - delete at head and move head to next symbol.
+    - delete at head and move head to previous symbol.
+    - possible: delete substring relative to head.
+      - this is like several successive head moves and single-symbol deletes.
+  - insertion.
+    - insert symbol after head.
+    - insert symbol before head.
+    - possible: insert substring relative to head.
+      - this is like several successive head moves and single-symbol inserts.
+  - replacing.
+    - replace symbol at head.
+    - possible: replace substring relative to head.
+      - this is like several successive head moves and single-symbol inserts and deletes.
+  - possible: joining/polymerizing/appending.
+    - this is like combinations of the above.
+  - slightly different issue: replicating a strand: when bound to a strand at
+    an otherwise unbound point, second-bind new symbols at that point,
+    appending them to whatever other strand is adjacently bound.
+    - or build replicated strand at an offset relative to the FSM-strand bind point.
+    - this is a horrible explanation; work on it; try visualizing.
+    - what about mistakes? this might take the form of trying to bind a symbol,
+      and failing, but sucessfully appending it to the adjacently-bound strand.
+      We might also fail to bind or append at a point, leaving the growing
+      adjacently-bound strand with a missing symbol. We might also accidentally
+      insert an extra symbol.
+- In each of these operations, some strand is altered. When we alter a strand,
+  we insert its new sequence, mark the new sequence's id as the parent id of
+  the strand, and then delete the old sequence if it has no more references.
+  This can be a single operation: ReplaceSequence(). This should probably be
+  done in the cFSMDB, so it will need the strand's ID and the new sequence as
+  arguments.
 BOOKMARK 20130825-2236
 - Working on test NFA.brainstorm. I've implemented a basic NFADef and NFA with
   a transition relation, and I've exercised it in the brainstorm test. Now I'm
@@ -636,19 +675,20 @@ namespace nFSMDBTests {
     int InsertSequence(const Apto::String &sequence) { return cFSMDB::InsertSequence(sequence); }
     void UnlinkSeqLbls(int seq_id) { cFSMDB::UnlinkSeqLbls(seq_id); }
     bool RemoveSequence(int seq_id) { return cFSMDB::RemoveSequence(seq_id); }
-    int CreateStrand(const Apto::String &sequence) { return cFSMDB::CreateStrand(sequence); }
   };
 
 
-//  TEST(cFSMdb, instantiation){
-//    cFSMDBTestFixture db;
-//    /* Simple check to make sure instantiation works. */
-//    /* Call methods to ensure instantiation of template class. */
-//    /* Indices should initially be empty, so have zero size! */
-//    EXPECT_EQ(0, db.m_seq_idx.GetSize());
-//    EXPECT_EQ(0, db.m_strand_idx.GetSize());
-//    EXPECT_EQ(0, db.m_label_idx.GetSize());
-//  }
+  TEST(cFSMdb, instantiation){
+    cFSMDBTestFixture db;
+    /* Simple check to make sure instantiation works. */
+    /* Call methods to ensure instantiation of template class. */
+    /* Indices should initially be empty, so have zero size! */
+    EXPECT_EQ(0, db.m_lbls.GetSize());
+    EXPECT_EQ(0, db.m_seqs.GetSize());
+    EXPECT_EQ(0, db.m_fsm_defs.GetSize());
+    EXPECT_EQ(0, db.m_half_bindings.GetSize());
+    EXPECT_EQ(0, db.m_bindables.GetSize());
+  }
 
 
 //  TEST(cFSMdb, brainstorm){
@@ -822,7 +862,6 @@ namespace nFSMDBTests {
 
 //  TEST(cFSMdb, sequence_is_referenced){
 //  }
-
 
 
   TEST(cFSMDB, brainstorm_0){
@@ -1102,10 +1141,48 @@ namespace nFSMDBTests {
     EXPECT_EQ(0, db.m_lbls.GetSize());
   }
 
-
-  TEST(cFSMDB, brainstorm_3) {
+  TEST(cFSMdb, AssociateSeqToStrand){
     cFSMDBTestFixture db;
+    /*
+    This is a debruijn sequence containing:
+    - one each of all triplet labels with 'a', 'b', 'c', or 'd';
+    - four each of all couplet labels with 'a', 'b', 'c', or 'd';
+    - 64 each of all singlet labels with 'a', 'b', 'c', or 'd';
+    - one extra 'aa' and two extra 'a's (because I made the tail of the sequence
+      overlap with the head by two characters, in order to ensure that every
+      triplet is present).
+    */
+    EXPECT_EQ(0, db.m_bindables.GetSize());
+    int strand_id_0 = db.CreateStrand();
+    Apto::String seq_0("aaabaacaadabbabcabdacbaccacdadbadcaddbbbcbbdbccbcdbdcbddcccdcdddaa");
+    /* Database should be mostly empty since strand and sequence aren't associated, and seq isn't in database. */
+    EXPECT_EQ(1, db.m_bindables.GetSize());
+    EXPECT_EQ(0, db.m_lbls.GetSize());
+    EXPECT_EQ(0, db.m_seqs.GetSize());
+    EXPECT_EQ("", db.m_bindables.Get<cStrand>(strand_id_0)->AsString(db));
 
+    db.AssociateSeqToStrand(strand_id_0, seq_0);
+
+    /* Database should now have more stuff since strand and sequence have been associated. */
+    EXPECT_EQ(1, db.m_bindables.GetSize());
+    /*
+    There are 64 unique labels of length three; 16 of length two; and four of
+    length one; so there are a total of 84 unique labels appearing in the
+    debruijn sequence.
+    */
+    EXPECT_EQ(84, db.m_lbls.GetSize());
+    EXPECT_EQ(1, db.m_seqs.GetSize());
+    EXPECT_EQ("aaabaacaadabbabcabdacbaccacdadbadcaddbbbcbbdbccbcdbdcbddcccdcdddaa", db.m_bindables.Get<cStrand>(strand_id_0)->AsString(db));
+
+    db.AssociateSeqToStrand(strand_id_0, "");
+    /* Database should be mostly empty again since strand and sequence aren't associated anymore. */
+    EXPECT_EQ(1, db.m_bindables.GetSize());
+    EXPECT_EQ(0, db.m_lbls.GetSize());
+    EXPECT_EQ(0, db.m_seqs.GetSize());
+    EXPECT_EQ("", db.m_bindables.Get<cStrand>(strand_id_0)->AsString(db));
+
+    db.RemoveStrand(strand_id_0);
+    EXPECT_EQ(0, db.m_bindables.GetSize());
   }
 }
 
@@ -1856,6 +1933,13 @@ TEST(NFA, brainstorm) {
   nfa_def->m_transition_relation[4]['a'].Push(0);
   //nfa_def->m_transition_relation[4]['b'];
   //nfa_def->m_transition_relation[4]['c'];
+  nfa_def->m_function_relation[0].Push(0);
+  nfa_def->m_function_relation[1].Push(1);
+  nfa_def->m_function_relation[2].Push(2);
+  nfa_def->m_function_relation[2].Push(3);
+  nfa_def->m_function_relation[3].Push(2);
+  nfa_def->m_function_relation[3].Push(3);
+  nfa_def->m_function_relation[4].Push(4);
   /* Instantiate NFA using the NFADef. */
   cNFA *nfa = db.m_bindables.Create<cNFA>();
   nfa->m_rng = db.m_rng;

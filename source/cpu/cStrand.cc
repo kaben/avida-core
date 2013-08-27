@@ -444,17 +444,34 @@ Apto::String cFSM::AsString(cFSMDB &db) {
 int cNFA::Transition(int symbol_id, cFSMDB &db) {
   cNFADef *nfa_def = db.m_fsm_defs.Get<cNFADef>(m_fsm_def_id);
   cout << "symbol_id: " << symbol_id << ", current m_state_id: " << m_state_id;
-  if ((nfa_def != NULL) && nfa_def->m_transition_relation.Has(m_state_id) && nfa_def->m_transition_relation[m_state_id].Has(symbol_id)) {
-    int num_states = nfa_def->m_transition_relation[m_state_id][symbol_id].GetSize();
-    if (1 < num_states) {
-      cout << ", num_states: " << num_states;
-      int next_state_idx = m_rng->GetInt(0, num_states);
-      cout << ", next_state_idx: " << next_state_idx;
-      m_state_id = nfa_def->m_transition_relation[m_state_id][symbol_id][next_state_idx];
-    } else {
-      m_state_id = nfa_def->m_transition_relation[m_state_id][symbol_id][0];
+  if (nfa_def != NULL) {
+    if (nfa_def->m_transition_relation.Has(m_state_id) && nfa_def->m_transition_relation[m_state_id].Has(symbol_id)) {
+      int num_states = nfa_def->m_transition_relation[m_state_id][symbol_id].GetSize();
+      if (1 < num_states) {
+        cout << ", num_states: " << num_states;
+        int state_idx = m_rng->GetInt(0, num_states);
+        cout << ", state_idx: " << state_idx;
+        m_state_id = nfa_def->m_transition_relation[m_state_id][symbol_id][state_idx];
+      } else {
+        m_state_id = nfa_def->m_transition_relation[m_state_id][symbol_id][0];
+      }
     }
-  } else {
+    if (nfa_def->m_function_relation.Has(m_state_id)) {
+      int num_functors = nfa_def->m_function_relation[m_state_id].GetSize();
+      cout << ", num_functors: " << num_functors;
+      int functor_id = -1;
+      if (1 < num_functors) {
+        int functor_idx = m_rng->GetInt(0, num_functors);
+        cout << ", functor_idx: " << functor_idx;
+        functor_id = nfa_def->m_function_relation[m_state_id][functor_idx];
+        cout << ", functor_id: " << functor_id;
+      } else {
+        functor_id = nfa_def->m_function_relation[m_state_id][0];
+      }
+      //FSMFunctor functor;
+      cout << endl;
+      db.m_functors[functor_id](ID());
+    }
   }
   cout << ", next m_state_id: " << m_state_id << endl;
   return m_state_id;
@@ -527,6 +544,60 @@ bool cSeqIdx::Delete(int id) {
 bool cSeqIdx::Delete(const Apto::String &str) { return Delete(GetID(str)); }
 
 
+cFSMFunctorObject::cFSMFunctorObject(cFSMDB &db)
+: m_db(db)
+{}
+void cFSMFunctorObject::Function0(int caller_id){
+  cout << "cFSMFunctorObject::Function0(" << caller_id << ")" << endl;
+}
+void cFSMFunctorObject::Function1(int caller_id){
+  cout << "cFSMFunctorObject::Function1(" << caller_id << ")" << endl;
+}
+void cFSMFunctorObject::Function2(int caller_id){
+  cout << "cFSMFunctorObject::Function2(" << caller_id << ")" << endl;
+}
+void cFSMFunctorObject::Function3(int caller_id){
+  cout << "cFSMFunctorObject::Function3(" << caller_id << ")" << endl;
+}
+void cFSMFunctorObject::Function4(int caller_id){
+  cout << "cFSMFunctorObject::Function4(" << caller_id << ")" << endl;
+}
+void cFSMFunctorObject::Function5(int caller_id){
+  cout << "cFSMFunctorObject::Function5(" << caller_id << ")" << endl;
+}
+void cFSMFunctorObject::Function6(int caller_id){
+  cout << "cFSMFunctorObject::Function6(" << caller_id << ")" << endl;
+}
+void cFSMFunctorObject::Function7(int caller_id){
+  cout << "cFSMFunctorObject::Function7(" << caller_id << ")" << endl;
+}
+void cFSMFunctorObject::Function8(int caller_id){
+  cout << "cFSMFunctorObject::Function8(" << caller_id << ")" << endl;
+}
+void cFSMFunctorObject::Function9(int caller_id){
+  cout << "cFSMFunctorObject::Function9(" << caller_id << ")" << endl;
+}
+
+
+cFSMDB::cFSMDB()
+: m_rng(new Apto::RNG::AvidaRNG)
+//, m_kinetics(m_rng)
+, m_collision_scheduler(0, m_rng)
+, m_unbinding_scheduler(0)
+, m_functors(10)
+, m_functor_object(*this)
+{
+  m_functors[0] = FSMFunctor(&m_functor_object, &cFSMFunctorObject::Function0);
+  m_functors[1] = FSMFunctor(&m_functor_object, &cFSMFunctorObject::Function1);
+  m_functors[2] = FSMFunctor(&m_functor_object, &cFSMFunctorObject::Function2);
+  m_functors[3] = FSMFunctor(&m_functor_object, &cFSMFunctorObject::Function3);
+  m_functors[4] = FSMFunctor(&m_functor_object, &cFSMFunctorObject::Function4);
+  m_functors[5] = FSMFunctor(&m_functor_object, &cFSMFunctorObject::Function5);
+  m_functors[6] = FSMFunctor(&m_functor_object, &cFSMFunctorObject::Function6);
+  m_functors[7] = FSMFunctor(&m_functor_object, &cFSMFunctorObject::Function7);
+  m_functors[8] = FSMFunctor(&m_functor_object, &cFSMFunctorObject::Function8);
+  m_functors[9] = FSMFunctor(&m_functor_object, &cFSMFunctorObject::Function9);
+}
 int cFSMDB::InsertSequence(const Apto::String& seq) {
   if (!m_seqs.Has(seq)) {
     Apto::Array<cHit, Apto::Smart> hits(bScanForLabels(seq, m_label_utils));
@@ -568,34 +639,63 @@ bool cFSMDB::RemoveSequence(int seq_id) {
   UnlinkSeqLbls(seq_id);
   return m_seqs.Delete(seq_id);
 }
-int cFSMDB::CreateStrand(const Apto::String &seq) {
+int cFSMDB::CreateStrand() {
   /* Get or create strand and sequence */
   cStrand* strand_ptr = m_bindables.Create<cStrand>();
+  strand_ptr->m_seq_id = -1;
   int strand_id = strand_ptr->ID();
-  int seq_id = InsertSequence(seq);
-  cSequence* seq_ptr = m_seqs.Get(seq_id);
-  /* Link strand and sequence. */
-  strand_ptr->m_seq_id = seq_id;
-  seq_ptr->m_strand_ids.Insert(strand_id);
-  /*
-  Schedule collisions with priority proportional to strand length.
-  This is a place where we might be able to control the probability that two
-  particular molecules will collide.
-  */
   m_collision_scheduler.Resize(m_bindables.GetMaxCt());
-  m_collision_scheduler.AdjustPriority(strand_id, seq.GetSize());
+  m_collision_scheduler.AdjustPriority(strand_id, 0);
   return strand_id;
 }
-bool cFSMDB::RemoveStrand(int strand_id) {
+int cFSMDB::CreateStrand(const Apto::String &seq) {
+  int strand_id = CreateStrand();
+  AssociateSeqToStrand(strand_id, seq);
+  return strand_id;
+}
+bool cFSMDB::AssociateSeqToStrand(int strand_id, const Apto::String &seq) {
   cStrand* strand_ptr = m_bindables.Get<cStrand>(strand_id);
-  if (strand_ptr) {
-    cSequence* seq_ptr = m_seqs.Get(strand_ptr->m_seq_id);
-    seq_ptr->m_strand_ids.Remove(strand_id);
-    if (seq_ptr->m_strand_ids.GetSize() < 1) { RemoveSequence(strand_ptr->m_seq_id); }
-    /* Unschedule collisions for this strand ID. */
-    m_collision_scheduler.AdjustPriority(strand_id, 0.);
-    return m_bindables.Delete(strand_id);
-  } else { return false; }
+  //if (NULL == strand_ptr) { return false; }
+  assert(NULL != strand_ptr);
+  int old_seq_id = strand_ptr->m_seq_id;
+
+  /* Disassociate old sequence, if any. */
+  cSequence* old_seq_ptr(NULL);
+  if (0 <= old_seq_id) {
+    old_seq_ptr = m_seqs.Get(old_seq_id);
+    //if (NULL == old_seq_ptr) { return false; }
+    assert(NULL != old_seq_ptr);
+    /* Unlink strand and old sequence. */
+    old_seq_ptr->m_strand_ids.Remove(strand_id);
+    strand_ptr->m_seq_id = -1;
+  }
+
+  /* Associate new sequence, if any. */
+  if (0 < seq.GetSize()) {
+    int new_seq_id = InsertSequence(seq);
+    cSequence* new_seq_ptr = m_seqs.Get(new_seq_id);
+    //if (NULL == new_seq_ptr) { return false; }
+    assert(NULL != new_seq_ptr);
+    /* Link strand and new sequence. */
+    strand_ptr->m_seq_id = new_seq_id;
+    new_seq_ptr->m_strand_ids.Insert(strand_id);
+  }
+
+  /* If old sequence no longer has any associated strands, delete it. */
+  if (0 <= old_seq_id) {
+    if (old_seq_ptr->m_strand_ids.GetSize() < 1) { RemoveSequence(old_seq_id); }
+  }
+  m_collision_scheduler.AdjustPriority(strand_id, seq.GetSize());
+
+  return true;
+}
+bool cFSMDB::RemoveStrand(int strand_id) {
+  bool okay = true;
+  if (!AssociateSeqToStrand(strand_id, "")) { okay = false; }
+  if (!m_bindables.Delete(strand_id)) { okay = false; }
+  //return okay;
+  assert(okay);
+  return true;
 }
 int cFSMDB::CreateFSMBootstrap() {
   cFSMBootstrap* ptr = m_bindables.Create<cFSMBootstrap>();

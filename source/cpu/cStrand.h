@@ -45,6 +45,7 @@ class ObjBase;
 class cBasicLabelUtils;
 class cBindable;
 class cFSM;
+class cFSMFunctorObject;
 class cFSMDB;
 class cFSMDef;
 class cHit;
@@ -56,6 +57,9 @@ class cStrand;
 template <class T> class ObjIdx;
 
 Apto::Array<cHit, Apto::Smart> bScanForLabels(const Apto::String&, const cBasicLabelUtils&);
+
+
+typedef Apto::Functor<void, Apto::TL::Create<int> > FSMFunctor;
 
 
 namespace Apto {
@@ -307,28 +311,9 @@ public:
 
 class cNFADef : public cFSMDef {
 public:
-  /* int next_state_id = m_transition_relation[state_id][symbol_id][next_state_idx]; */
-  /*
-  int state_id;
-  int symbol_id;
-  if (m_transition_relation.Has(state_id) && m_transition_relation[state_id].Has(symbol_id)) {
-    int num_states = m_transition_relation[state_id][symbol_id].GetSize();
-    int next_state_idx = random.GetInt(0, num_states - 1);
-    int next_state_id = m_transition_relation[state_id][symbol_id][next_state_idx];
-  } else {
-  }
-  */
+  /* Use: int next_state_id = m_transition_relation[state_id][symbol_id][next_state_idx]; */
   Apto::Map<int, Apto::Map<int, Apto::Array<int> > > m_transition_relation;
-  /* int function_id = m_function_relation[state_id][function_idx]; */
-  /*
-  int state_id;
-  if (m_function_relation.Has(state_id)) {
-    int num_functions = m_function_relation[state_id].GetSize();
-    int function_idx = random.GetInt(0, num_functions - 1);
-    int function_id = m_function_relation[state_id][function_idx];
-  } else {
-  }
-  */
+  /* Use: int function_id = m_function_relation[state_id][function_idx]; */
   Apto::Map<int, Apto::Array<int> > m_function_relation;
 };
 
@@ -540,6 +525,23 @@ public:
   {};
 };
 
+class cFSMFunctorObject {
+  cFSMDB &m_db;
+public:
+  cFSMFunctorObject(cFSMDB &db);
+public:
+  void Function0(int caller_id);
+  void Function1(int caller_id);
+  void Function2(int caller_id);
+  void Function3(int caller_id);
+  void Function4(int caller_id);
+  void Function5(int caller_id);
+  void Function6(int caller_id);
+  void Function7(int caller_id);
+  void Function8(int caller_id);
+  void Function9(int caller_id);
+};
+
 class cFSMDB {
 public:
   Apto::SmartPtr<Apto::RNG::AvidaRNG> m_rng;
@@ -556,7 +558,13 @@ public:
 
   cBasicLabelUtils m_label_utils;
 
+  Apto::Array<FSMFunctor> m_functors;
+
+  cFSMFunctorObject m_functor_object;
+
+  int CreateStrand();
   int CreateStrand(const Apto::String &sequence);
+  bool AssociateSeqToStrand(int strand_id, const Apto::String &seq);
   bool RemoveStrand(int strand_id);
 
   int CreateFSMBootstrap();
@@ -568,12 +576,7 @@ public:
   bool SingleRebinding();
 
 public:
-  cFSMDB()
-  : m_rng(new Apto::RNG::AvidaRNG)
-  //, m_kinetics(m_rng)
-  , m_collision_scheduler(0, m_rng)
-  , m_unbinding_scheduler(0)
-  {}
+  cFSMDB();
 protected:
   int InsertSequence(const Apto::String &sequence);
   void UnlinkSeqLbls(int seq_id);
