@@ -837,6 +837,9 @@ namespace nFSMDBTests {
     int InsertSequence(const Apto::String &sequence) { return cFSMDB::InsertSequence(sequence); }
     void UnlinkSeqLbls(int seq_id) { cFSMDB::UnlinkSeqLbls(seq_id); }
     bool RemoveSequence(int seq_id) { return cFSMDB::RemoveSequence(seq_id); }
+    cFSMDBTestFixture(int rng_seed = -1)
+    : cFSMDB(rng_seed)
+    {}
   };
 
 
@@ -1346,26 +1349,68 @@ namespace nFSMDBTests {
   }
 
   TEST(cFSMDB, LyseStrand){
-    cFSMDBTestFixture db;
+    int rng_seed = 0;
+    cFSMDBTestFixture db(rng_seed);
     db.m_label_utils.m_max_label_size = 6;
     int strand_id_0 = db.CreateStrand();
     int strand_id_1 = db.CreateStrand();
     db.AssociateSeqToStrand(strand_id_0, "aaaaaagbbbbbbnopqrstuvwxcccccc");
     db.AssociateSeqToStrand(strand_id_1, "aaaaaagddddddnopqrstuvwxcccccc");
     db.Collide(strand_id_0, strand_id_1);
-    db.LyseStrand(strand_id_0, 10);
-    db.RemoveStrand(strand_id_0);
+    /*
+    There should now be two strands and two sequences. The two strands should
+    be bound at three locations, making six half bindings.
+    */
+    EXPECT_EQ(2, db.m_bindables.GetSize());
+    EXPECT_EQ(2, db.m_seqs.GetSize());
+    EXPECT_EQ(6, db.m_half_bindings.GetSize());
+
+    int daughter_id_0 = -1, daughter_id_1 = -1;
+    db.LyseStrand(strand_id_0, 10, daughter_id_0, daughter_id_1);
+    /*
+    Strand 0 has been lysed into two daughter strands. One of the three
+    bindings was located across the lysing boundary, so should not have
+    survived the lysing. The other two bindings should have survived; now each
+    daughter should have its own binding to strand 1. There should now be three
+    strands, three sequences, and four half bindings.
+    */
+    EXPECT_EQ(3, db.m_bindables.GetSize());
+    EXPECT_EQ(3, db.m_seqs.GetSize());
+    EXPECT_EQ(4, db.m_half_bindings.GetSize());
+
+    db.RemoveStrand(daughter_id_0);
+    /*
+    One of the daughter strands has been deleted, so its binding should also be
+    deleted. The other daughter should still be bound to strand 1. There should
+    remain two strands, two sequences, and two half bindings.
+    */
+    EXPECT_EQ(2, db.m_bindables.GetSize());
+    EXPECT_EQ(2, db.m_seqs.GetSize());
+    EXPECT_EQ(2, db.m_half_bindings.GetSize());
+
+    db.RemoveStrand(daughter_id_1);
+    /*
+    Now that the second daughter has been deleted, there should be no more
+    bindings to strand 1. There should remain one strand and one sequence, but
+    no half bindings.
+    */
+    EXPECT_EQ(1, db.m_bindables.GetSize());
+    EXPECT_EQ(1, db.m_seqs.GetSize());
+    EXPECT_EQ(0, db.m_half_bindings.GetSize());
+
+    db.RemoveStrand(strand_id_1);
+    /*
+    The final strand has been removed. There should be no strands, sequences,
+    or half bindings.
+    */
+    EXPECT_EQ(0, db.m_bindables.GetSize());
+    EXPECT_EQ(0, db.m_seqs.GetSize());
+    EXPECT_EQ(0, db.m_half_bindings.GetSize());
   }
 }
 
 
 namespace nContainerConversion {
-
-  template <class T> Apto::Set<T> AsSet(Apto::Array<T> &ary) {
-    Apto::Set<T> set;
-    for (int i=0; i < ary.GetSize(); i++) { set.Insert(ary[i]); }
-    return set;
-  }
   TEST(ContainerConversion, Array_AsSet){
     Apto::Array<int> ary;
 
@@ -1379,43 +1424,29 @@ namespace nContainerConversion {
     for (int i=0; i<100; i++) { EXPECT_EQ(0, ary[i]); }
   }
 
-  template <class T> Apto::Array<T> AsArray(Apto::Set<T> &set) {
-    Apto::Array<T> ary;
-    for (typename Apto::Set<T>::Iterator it = set.Begin(); it.Next();) { ary.Push(*it.Get()); }
-    return ary;
-  }
   TEST(ContainerConversion, DISABLED_Set_AsArray){
+    /* This test fails for sets of size > 92. See regressions below.  */
     Apto::Set<int> set;
-    for (int i=0; i<100; i++) { set.Insert(i); }
-    for (int i=0; i<100; i++) { EXPECT_TRUE(set.Has(i)); }
+    for (int i=0; i<92; i++) { set.Insert(i); }
+    for (int i=0; i<92; i++) { EXPECT_TRUE(set.Has(i)); }
 
     Apto::Array<int> ary = AsArray(set);
-    EXPECT_EQ(100, ary.GetSize());
+    EXPECT_EQ(92, ary.GetSize());
 
-    for (int i=0; i<100; i++) { cout << "ary[" << i << "]: " << ary[i] << endl; }
-    for (int i=0; i<100; i++) {
-      //EXPECT_TRUE(set.Has(ary[i]));
-      //if (set.Has(ary[i])) {
-      //  set.Remove(ary[i]);
-      //}
-      int x = ary[i];
-      EXPECT_TRUE(set.Has(x));
-      if (set.Has(x)) {
-        set.Remove(x);
-      }
-    }
+    for (int i=0; i<92; i++) { set.Remove(i); }
     EXPECT_EQ(0, set.GetSize());
   }
 
-  TEST(Set, DISABLED_regression_1) {
+  /* Note: 93 = (4 * HashSize) + 1. */
+  TEST(Set, DISABLED_regression_in_Remove) {
     Apto::Set<int> set;
-    for (int i=0; i<100; i++) { set.Insert(i); }
-    for (int i=0; i<100; i++) { set.Remove(i); }
+    for (int i=0; i<93; i++) { set.Insert(i); }
+    for (int i=0; i<93; i++) { set.Remove(i); }
   }
-  TEST(Map, DISABLED_regression_1) {
+  TEST(Map, DISABLED_regression_in_Remove) {
     Apto::Map<int, int> map;
-    for (int i=0; i<100; i++) { map.Set(i, i); }
-    for (int i=0; i<100; i++) { map.Remove(i); }
+    for (int i=0; i<93; i++) { map.Set(i, i); }
+    for (int i=0; i<93; i++) { map.Remove(i); }
   }
 }
 

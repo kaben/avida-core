@@ -424,6 +424,10 @@ int cBasicLabelUtils::ReverseComplement(const int id, const int rot) const {
   return new_id;
 }
 
+void cHalfBinding::Print() {
+  cout << "cHalfBinding::Print(): ID: " << ID() << ", m_parent_id: " << m_parent_id << ", m_lbl_id: " << m_lbl_id << ", m_lbl_pos: " << m_lbl_pos << ", m_lbl_len: " << m_lbl_len << ", m_other_half_binding_id: " << m_other_half_binding_id << endl;
+}
+
 Apto::Array<int> cBindable::GetBindings(cFSMDB &db) {
   Apto::Set<int> half_binding_set;
   for (Apto::Map<int, Apto::Set<int> >::KeyIterator kit = m_bindpts.Keys(); kit.Next();) {
@@ -591,8 +595,8 @@ void cFSMFunctorObject::Function9(int caller_id){
 }
 
 
-cFSMDB::cFSMDB()
-: m_rng(new Apto::RNG::AvidaRNG)
+cFSMDB::cFSMDB(int rng_seed)
+: m_rng(new Apto::RNG::AvidaRNG(rng_seed))
 //, m_kinetics(m_rng)
 , m_collision_scheduler(0, m_rng)
 , m_unbinding_scheduler(0)
@@ -694,73 +698,131 @@ void cFSMDB::AssociateSeqToStrand(int strand_id, const Apto::String &seq) {
   m_collision_scheduler.AdjustPriority(strand_id, seq.GetSize());
 }
 void cFSMDB::RemoveStrand(int strand_id) {
-  AssociateSeqToStrand(strand_id, "");
-  m_bindables.Delete(strand_id);
-}
-void cFSMDB::LyseStrand(int strand_id, int at_pos) {
-  cStrand* par_ptr = m_bindables.Get<cStrand>(strand_id); assert(NULL != par_ptr);
-  Apto::String par_str(par_ptr->AsString(*this));
-  int par_len = par_str.GetSize(); assert(at_pos <= par_len);
-  Apto::String daught_0_str(par_str.Substring(0, at_pos));
-  Apto::String daught_1_str(par_str.Substring(at_pos));
-  int daught_0_id = CreateStrand(par_str.Substring(0, at_pos));
-  int daught_1_id = CreateStrand(par_str.Substring(at_pos));
-  cStrand *daught_0 = m_bindables.Get<cStrand>(daught_0_id);
-  cStrand *daught_1 = m_bindables.Get<cStrand>(daught_1_id);
-  cout << "par_str: " << par_str << ", at_pos: " << at_pos << endl;
-  cout << "daught_0: " << daught_0_str << endl;
-  cout << "daught_1: " << daught_1_str << endl;
-
-  Apto::Map<int, Apto::Set<int> > daught_0_lbls, daught_1_lbls;
-  Apto::Map<int, Apto::Array<int> > &daught_0_lbl_arys(daught_0->GetLabels(*this));
-  Apto::Map<int, Apto::Array<int> > &daught_1_lbl_arys(daught_1->GetLabels(*this));
-  for (Apto::Map<int, Apto::Array<int> >::KeyIterator kit = daught_0_lbl_arys.Keys(); kit.Next();){
-    int lbl_id = *kit.Get();
-    int pos_ct = daught_0_lbl_arys[lbl_id].GetSize();
-    for (int i=0; i<pos_ct; i++) { daught_0_lbls[lbl_id].Insert(daught_0_lbl_arys[lbl_id][i]); }
-  }
-  for (Apto::Map<int, Apto::Array<int> >::KeyIterator kit = daught_1_lbl_arys.Keys(); kit.Next();){
-    int lbl_id = *kit.Get();
-    int pos_ct = daught_1_lbl_arys[lbl_id].GetSize();
-    for (int i=0; i<pos_ct; i++) { daught_1_lbls[lbl_id].Insert(daught_1_lbl_arys[lbl_id][i]); }
-  }
-
-  for (Apto::Map<int, Apto::Set<int> >::KeyIterator pos_it = par_ptr->m_bindpts.Keys(); pos_it.Next();) {
-    int pos = *pos_it.Get();
-    for (Apto::Set<int>::Iterator id_it = par_ptr->m_bindpts[pos].Begin(); id_it.Next();) {
-      int lbl_hb_id = *id_it.Get();
-      cHalfBinding *lbl_hb = m_half_bindings.Get(lbl_hb_id);
-      int lbl_id = lbl_hb->m_lbl_id;
-      int lbl_len = lbl_hb->m_lbl_len;
-      cout << "pos: " << pos << ", lbl_hb_id: " << lbl_hb_id << ", lbl: " << m_label_utils.ID2Seq(lbl_id) << endl;
-      if (pos < at_pos) {
-        /* Transfer to daughter 0. */
-        if (daught_0_lbls.Has(lbl_id) && daught_0_lbls[lbl_id].Has(pos)) {
-          cout << "transferring to daughter 0" << endl;
-          lbl_hb->m_parent_id = daught_0_id;
-          for (int i=0; i < lbl_len; i++) { daught_0->m_bindpts[pos].Insert(lbl_hb_id); }
-        }
-      } else {
-        /* Transfer to daughter 1. */
-        int lbl_pos = lbl_hb->m_lbl_pos - at_pos;
-        if (daught_1_lbls.Has(lbl_id) && daught_1_lbls[lbl_id].Has(lbl_pos)) {
-          cout << "transferring to daughter 1" << endl;
-          lbl_hb->m_parent_id = daught_1_id;
-          lbl_hb->m_lbl_pos = lbl_pos;
-          for (int i=0; i < lbl_len; i++) { daught_1->m_bindpts[lbl_pos].Insert(lbl_hb_id); }
-        }
-      }
+  /*
+  Extract a list of half binding IDs in the parent.
+  This is a good candidate for cleanup.
+  */
+  cStrand* par = m_bindables.Get<cStrand>(strand_id); assert(NULL != par);
+  Apto::Set<int> par_hb_ids;
+  for (Apto::Map<int, Apto::Set<int> >::KeyIterator pos_it = par->m_bindpts.Keys(); pos_it.Next();) {
+    for (Apto::Set<int>::Iterator id_it = par->m_bindpts[*pos_it.Get()].Begin(); id_it.Next();) {
+      par_hb_ids.Insert(*id_it.Get());
     }
   }
-    //for (Apto::Map<int, Apto::Set<int> >::KeyIterator it = lbl_sites.Keys(); it.Next();) {
-    //  int lbl_id = *it.Get();
-    //  seq_ptr->m_labels[lbl_id].Resize(lbl_sites[lbl_id].GetSize());
-    //  int j=0;
-    //  for (Apto::Set<int>::Iterator pos_it = lbl_sites[lbl_id].Begin(); pos_it.Next();) {
-    //    seq_ptr->m_labels[lbl_id][j] = *pos_it.Get();
-    //    j++;
-    //  }
-    //}
+  /*
+  Delete all half bindings; also find and delete their other halves.
+  */
+  for (Apto::Set<int>::Iterator it = par_hb_ids.Begin(); it.Next();) {
+    int lbl_hb_id = *it.Get();
+    cHalfBinding *lbl_hb = m_half_bindings.Get(lbl_hb_id);
+    int lbl_pos = lbl_hb->m_lbl_pos;
+    int lbl_len = lbl_hb->m_lbl_len;
+    int rvc_hb_id = lbl_hb->m_other_half_binding_id;
+    cHalfBinding *rvc_hb = m_half_bindings.Get(rvc_hb_id);
+    int rvc_pos = rvc_hb->m_lbl_pos;
+    cBindable *rvc_par = m_bindables.Get(rvc_hb->m_parent_id);
+    for (int i=0; i< lbl_len; i++) {
+      rvc_par->m_bindpts[rvc_pos + i].Remove(rvc_hb_id);
+      if (0 == rvc_par->m_bindpts[rvc_pos + i].GetSize()) {
+        rvc_par->m_bindpts.Remove(rvc_pos + i);
+      }
+    }
+    m_half_bindings.Delete(rvc_hb_id);
+    m_half_bindings.Delete(lbl_hb_id);
+  }
+  par->m_bindpts.Clear();
+  /* Disassociate strand and sequence. */
+  AssociateSeqToStrand(strand_id, "");
+  /* Delete strand. */
+  m_bindables.Delete(strand_id);
+}
+void cFSMDB::LyseStrand(int strand_id, int at_pos, int &ret_d0_id, int &ret_d1_id) {
+  cStrand* par = m_bindables.Get<cStrand>(strand_id); assert(NULL != par);
+  Apto::String par_str(par->AsString(*this));
+  int par_len = par_str.GetSize(); assert(at_pos <= par_len);
+  ret_d0_id = CreateStrand(par_str.Substring(0, at_pos));
+  ret_d1_id = CreateStrand(par_str.Substring(at_pos));
+  cStrand *d0 = m_bindables.Get<cStrand>(ret_d0_id);
+  cStrand *d1 = m_bindables.Get<cStrand>(ret_d1_id);
+
+  /*
+  Convert daughters' pos-(label-array) maps to pos-(label-set) maps.
+  The latter will allow us to use Has() to check whether a label appears at the
+  given position in the daughter.
+
+  This is a good candidate for cleanup.
+  */
+  Apto::Map<int, Apto::Set<int> > d0_lbls, d1_lbls;
+  Apto::Map<int, Apto::Array<int> > &d0_lbl_arys(d0->GetLabels(*this));
+  Apto::Map<int, Apto::Array<int> > &d1_lbl_arys(d1->GetLabels(*this));
+  for (Apto::Map<int, Apto::Array<int> >::KeyIterator kit = d0_lbl_arys.Keys(); kit.Next();){
+    int lbl_id = *kit.Get();
+    int pos_ct = d0_lbl_arys[lbl_id].GetSize();
+    for (int i=0; i<pos_ct; i++) { d0_lbls[lbl_id].Insert(d0_lbl_arys[lbl_id][i]); }
+  }
+  for (Apto::Map<int, Apto::Array<int> >::KeyIterator kit = d1_lbl_arys.Keys(); kit.Next();){
+    int lbl_id = *kit.Get();
+    int pos_ct = d1_lbl_arys[lbl_id].GetSize();
+    for (int i=0; i<pos_ct; i++) { d1_lbls[lbl_id].Insert(d1_lbl_arys[lbl_id][i]); }
+  }
+
+  /*
+  Extract a list of half binding IDs in the parent.
+
+  This is a good candidate for cleanup.
+  */
+  Apto::Set<int> par_hb_ids;
+  for (Apto::Map<int, Apto::Set<int> >::KeyIterator pos_it = par->m_bindpts.Keys(); pos_it.Next();) {
+    int pos = *pos_it.Get();
+    for (Apto::Set<int>::Iterator id_it = par->m_bindpts[pos].Begin(); id_it.Next();) {
+      int lbl_hb_id = *id_it.Get();
+      par_hb_ids.Insert(lbl_hb_id);
+    }
+  }
+  /* Remove half bindings from parent. */
+  par->m_bindpts.Clear();
+
+  for (Apto::Set<int>::Iterator it = par_hb_ids.Begin(); it.Next();) {
+    int lbl_hb_id = *it.Get();
+    cHalfBinding *lbl_hb = m_half_bindings.Get(lbl_hb_id);
+    int lbl_id = lbl_hb->m_lbl_id;
+    int lbl_pos = lbl_hb->m_lbl_pos;
+    int lbl_len = lbl_hb->m_lbl_len;
+    bool found = false;
+    if (lbl_pos < at_pos) {
+      /* Transfer to daughter 0. */
+      if (d0_lbls.Has(lbl_id) && d0_lbls[lbl_id].Has(lbl_pos)) {
+        found = true;
+        lbl_hb->m_parent_id = ret_d0_id;
+        for (int i=0; i < lbl_len; i++) { d0->m_bindpts[lbl_pos + i].Insert(lbl_hb_id); }
+      }
+    } else {
+      /* Transfer to daughter 1. */
+      int offs_lbl_pos = lbl_pos - at_pos;
+      if (d1_lbls.Has(lbl_id) && d1_lbls[lbl_id].Has(offs_lbl_pos)) {
+        found = true;
+        lbl_hb->m_parent_id = ret_d1_id;
+        lbl_hb->m_lbl_pos = offs_lbl_pos;
+        for (int i=0; i < lbl_len; i++) { d1->m_bindpts[offs_lbl_pos + i].Insert(lbl_hb_id); }
+      }
+    }
+    /* Delete bindings that couldn't be transferred. */
+    if (!found) {
+      int rvc_hb_id = lbl_hb->m_other_half_binding_id;
+      cHalfBinding *rvc_hb = m_half_bindings.Get(rvc_hb_id);
+      int rvc_pos = rvc_hb->m_lbl_pos;
+      cBindable *rvc_par = m_bindables.Get(rvc_hb->m_parent_id);
+      for (int i=0; i< lbl_len; i++) {
+        rvc_par->m_bindpts[rvc_pos + i].Remove(rvc_hb_id);
+        if (0 == rvc_par->m_bindpts[rvc_pos + i].GetSize()) {
+          rvc_par->m_bindpts.Remove(rvc_pos + i);
+        }
+      }
+      m_half_bindings.Delete(rvc_hb_id);
+      m_half_bindings.Delete(lbl_hb_id);
+    }
+  }
+  RemoveStrand(strand_id);
 }
 int cFSMDB::CreateFSMBootstrap() {
   cFSMBootstrap* ptr = m_bindables.Create<cFSMBootstrap>();

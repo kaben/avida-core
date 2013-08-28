@@ -61,6 +61,16 @@ Apto::Array<cHit, Apto::Smart> bScanForLabels(const Apto::String&, const cBasicL
 
 typedef Apto::Functor<void, Apto::TL::Create<int> > FSMFunctor;
 
+template <class T> Apto::Set<T> AsSet(Apto::Array<T> &ary) {
+  Apto::Set<T> set;
+  for (int i=0; i < ary.GetSize(); i++) { set.Insert(ary[i]); }
+  return set;
+}
+template <class T> Apto::Array<T> AsArray(Apto::Set<T> &set) {
+  Apto::Array<T> ary;
+  for (typename Apto::Set<T>::Iterator it = set.Begin(); it.Next();) { ary.Push(*it.Get()); }
+  return ary;
+}
 
 namespace Apto {
   namespace Scheduler {
@@ -259,6 +269,7 @@ public:
     m_lbl_len = lbl_len;
     m_other_half_binding_id = other_half_binding_id;
   }
+  void Print();
 };
 
 
@@ -564,7 +575,7 @@ public:
   int CreateStrand(const Apto::String &sequence);
   void AssociateSeqToStrand(int strand_id, const Apto::String &seq);
   void RemoveStrand(int strand_id);
-  void LyseStrand(int strand_id, int at_position);
+  void LyseStrand(int strand_id, int at_position, int &ret_d0_id, int &ret_d1_id);
 
   int CreateFSMBootstrap();
 
@@ -575,7 +586,7 @@ public:
   bool SingleRebinding();
 
 public:
-  cFSMDB();
+  cFSMDB(int rng_seed = -1);
 protected:
   int InsertSequence(const Apto::String &sequence);
   void UnlinkSeqLbls(int seq_id);
