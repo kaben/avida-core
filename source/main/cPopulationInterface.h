@@ -107,7 +107,7 @@ public:
   int GetFacedCellID();
   int GetFacedDir(); // Returns the human interpretable facing of this org.
   int GetNeighborCellContents();
-  void Rotate(int direction = 1);
+  void Rotate(cAvidaContext& ctx, int direction = 1);
   int GetInputAt(int& input_pointer);
   void ResetInputs(cAvidaContext& ctx);
   const Apto::Array<int>& GetInputs() const;
@@ -243,7 +243,7 @@ public:
   double CalcGroupOddsImmigrants(int group_id, int mating_type);
   double CalcGroupOddsOffspring(cOrganism* parent);
   double CalcGroupOddsOffspring(int group_id);
-  bool AttemptImmigrateGroup(int group_id, cOrganism* org);
+  bool AttemptImmigrateGroup(cAvidaContext& ctx, int group_id, cOrganism* org);
   void PushToleranceInstExe(int tol_inst, cAvidaContext& ctx);
   int& GetGroupIntolerances(int group_id, int tol_num, int mating_type);
   
@@ -263,6 +263,7 @@ public:
   void KillRandPrey(cAvidaContext& ctx, cOrganism* org);
   void TryWriteLookData(cString& string);
   void TryWriteLookOutput(cString& string);
+  void TryWriteLookEXOutput(cString& string);
   
 // -------- Avatar support -------- @JJB
 private:
@@ -274,7 +275,7 @@ private:
     bool av_input;
     bool av_output;
     sIO_avatar() : av_cell_id(-1), av_facing(0), av_faced_cell(-1), av_input(false), av_output(false) { ; }
-    sIO_avatar(int av_cell_id, int av_facing, int av_faced_cell, bool input, bool output) : av_cell_id(av_cell_id), av_facing(av_facing), av_faced_cell(av_faced_cell), av_input(input), av_output(output) { ; }
+    sIO_avatar(int in_av_cell_id, int in_av_facing, int in_av_faced_cell, bool input, bool output) : av_cell_id(in_av_cell_id), av_facing(in_av_facing), av_faced_cell(in_av_faced_cell), av_input(input), av_output(output) { ; }
   };
 
   Apto::Array<sIO_avatar, Apto::Smart> m_avatars;
@@ -285,9 +286,9 @@ public:
   bool FacedHasAV(int av_num = 0);
   bool FacedHasPredAV(int av_num = 0);
   bool FacedHasPreyAV(int av_num = 0);
-  void AddIOAV(int av_cell_id, int av_facing, bool input, bool output);
-  void AddPredPreyAV(int av_cell_id);
-  void SwitchPredPrey(int av_num = 0);
+  void AddIOAV(cAvidaContext& ctx, int av_cell_id, int av_facing, bool input, bool output);
+  void AddPredPreyAV(cAvidaContext& ctx, int av_cell_id);
+  void SwitchPredPrey(cAvidaContext& ctx, int av_num = 0);
   void RemoveAllAV();
   int GetAVFacing(int av_num = 0);
   int GetAVCellID(int av_num = 0);
@@ -302,13 +303,13 @@ public:
   int GetAVDataUpdate(int av_num = 0);
   int GetAVDataTerritory(int av_num = 0);
   int FindAV(bool input, bool output, int av_num = 0);
-  void SetAVFacing(int av_facing, int av_num = 0);
-  bool SetAVCellID(int av_cell_id, int av_num = 0);
-  void SetAVFacedCellID(int av_num = 0);
+  void SetAVFacing(cAvidaContext& ctx, int av_facing, int av_num = 0);
+  bool SetAVCellID(cAvidaContext& ctx, int av_cell_id, int av_num = 0);
+  void SetAVFacedCellID(cAvidaContext& ctx, int av_num = 0);
   void SetAVCellData(const int newData, const int org_id, int av_num = 0);
   bool MoveAV(cAvidaContext& ctx, int av_num = 0);
-  bool RotateAV(int increment, int av_num = 0);
-  cOrganism* GetRandFacedAV(int av_num = 0);
+  bool RotateAV(cAvidaContext& ctx, int increment, int av_num = 0);
+  cOrganism* GetRandFacedAV(cAvidaContext& ctx, int av_num = 0);
   cOrganism* GetRandFacedPredAV(int av_num = 0);
   cOrganism* GetRandFacedPreyAV(int av_num = 0);
   Apto::Array<cOrganism*> GetFacedAVs(int av_num = 0);

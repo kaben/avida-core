@@ -885,6 +885,10 @@ bool cEnvironment::LoadGradientResource(cString desc, Feedback& feedback)
         if (!AssertInputInt(var_value, "move_speed", var_type, feedback)) return false;
         new_resource->SetMoveSpeed( var_value.AsInt() );
       }
+      else if (var_name == "move_resistance") {
+        if (!AssertInputInt(var_value, "move_resistance", var_type, feedback)) return false;
+        new_resource->SetMoveResistance( var_value.AsInt() );
+      }
       else if (var_name == "halo_width") {
         if (!AssertInputInt(var_value, "halo_width", var_type, feedback)) return false;
         new_resource->SetHaloWidth( var_value.AsInt() );
@@ -945,6 +949,10 @@ bool cEnvironment::LoadGradientResource(cString desc, Feedback& feedback)
       else if (var_name == "resistance") {
         if (!AssertInputDouble(var_value, "resistance", var_type, feedback)) return false;
         new_resource->SetResistance( var_value.AsDouble() );
+      } 
+      else if (var_name == "damage") {
+        if (!AssertInputDouble(var_value, "damage", var_type, feedback)) return false;
+        new_resource->SetDamage( var_value.AsDouble() );
       } 
       else if (var_name == "threshold") {
         if (!AssertInputDouble(var_value, "threshold", var_type, feedback)) return false;
@@ -1569,7 +1577,7 @@ void cEnvironment::DoProcesses(cAvidaContext& ctx, const tList<cReactionProcess>
       if (cellid != -1) { // can't do this in the test cpu
         cPopulationCell& cell = m_world->GetPopulation().GetCell(cellid);
         if (cell.CountGenomeFragments() > 0) {
-          InstructionSequence fragment = cell.PopGenomeFragment();
+          InstructionSequence fragment = cell.PopGenomeFragment(ctx);
           consumed = local_task_quality * fragment.GetSize();
           result.Consume(in_resource->GetID(), fragment.GetSize(), true);
           m_world->GetStats().GenomeFragmentMetabolized(taskctx.GetOrganism(), fragment);

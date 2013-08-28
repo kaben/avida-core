@@ -287,8 +287,7 @@ bool cHardwareTransSMT::SingleProcess(cAvidaContext& ctx, bool speculative)
   
   // Kill creatures who have reached their max num of instructions executed
   const int max_executed = m_organism->GetMaxExecuted();
-  if ((max_executed > 0 && phenotype.GetTimeUsed() >= max_executed)
-      || phenotype.GetToDie()) {
+  if ((max_executed > 0 && phenotype.GetTimeUsed() >= max_executed) || phenotype.GetToDie()) {
     m_organism->Die(ctx);
   }
   
@@ -305,11 +304,6 @@ bool cHardwareTransSMT::SingleProcess_ExecuteInst(cAvidaContext& ctx, const Inst
   // Copy Instruction locally to handle stochastic effects
   Instruction actual_inst = cur_inst;
   
-#ifdef EXECUTION_ERRORS
-  // If there is an execution error, execute a random instruction.
-  if (m_organism->TestExeErr()) actual_inst = m_inst_set->GetRandomInst(ctx);
-#endif /* EXECUTION_ERRORS */
-	
   // Get a pointer to the corrisponding method...
   int inst_idx = m_inst_set->GetLibFunctionIndex(actual_inst);
   
@@ -723,7 +717,7 @@ bool cHardwareTransSMT::ParasiteInfectHost(Systematics::UnitPtr bu)
   bu_seq_p.DynamicCastFrom(bu_gen.Representation());
   const InstructionSequence& bu_seq = *bu_seq_p;  
   m_mem_array[mem_space] = bu_seq;
-  
+    
   // Setup the thread
   m_threads[thread_id].Reset(this, mem_space);
   m_threads[thread_id].owner = bu;
@@ -1678,7 +1672,7 @@ bool cHardwareTransSMT::Inst_Apoptosis(cAvidaContext& ctx)
 
 
 //43
-bool cHardwareTransSMT::Inst_RotateLeft(cAvidaContext&)
+bool cHardwareTransSMT::Inst_RotateLeft(cAvidaContext& ctx)
 {
   const int num_neighbors = m_organism->GetNeighborhoodSize();
   
@@ -1686,13 +1680,13 @@ bool cHardwareTransSMT::Inst_RotateLeft(cAvidaContext&)
   if (num_neighbors == 0) return false;
   
   // Always rotate at least once.
-  m_organism->Rotate(1);
+  m_organism->Rotate(ctx, 1);
   
   return true;
 }
 
 //44
-bool cHardwareTransSMT::Inst_RotateRight(cAvidaContext&)
+bool cHardwareTransSMT::Inst_RotateRight(cAvidaContext& ctx)
 {
   const int num_neighbors = m_organism->GetNeighborhoodSize();
   
@@ -1700,7 +1694,7 @@ bool cHardwareTransSMT::Inst_RotateRight(cAvidaContext&)
   if (num_neighbors == 0) return false;
   
   // Always rotate at least once.
-  m_organism->Rotate(-1);
+  m_organism->Rotate(ctx, -1);
   
   return true;
 }

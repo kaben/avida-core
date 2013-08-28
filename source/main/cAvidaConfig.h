@@ -456,6 +456,8 @@ public:
 
   CONFIG_ADD_VAR(PARASITE_MEM_SPACES, int, 1, "Parasites get their own memory spaces");
   CONFIG_ADD_VAR(PARASITE_NO_COPY_MUT, int, 0, "Parasites do not get copy mutation rates");
+  CONFIG_ADD_VAR(PARASITE_USE_GENOTYPE_FILE, int, 0, "Parasite Genotypes are loaded from a file rather than replicated from parent -- see LoadParasiteGenotypeList");
+  CONFIG_ADD_VAR(HOST_USE_GENOTYPE_FILE, int, 0, "Host Genotypes are loaded from a file rather than replicated from parent -- see LoadHostGenotypeList");
 
 
   // -------- CPU Archetecture
@@ -573,9 +575,14 @@ public:
   CONFIG_ADD_GROUP(KABOOM_GROUP, "Kaboom");
   CONFIG_ADD_VAR(KABOOM_PROB, double, -1, "The probability (in decimal) that an explosion will occur when the instruction is encountered. -1 is default probability and allows the organism to change the probability.");
   CONFIG_ADD_VAR(KABOOM_RADIUS, int, 2, "Radius of all explosions (kaboom and kaboom5)");
-  CONFIG_ADD_VAR(KABOOM_HAMMING, int, 0, "Hamming distance of kaboom's threshold, set to -1 to have adjustable, default is 0 for cheaters.");
-  CONFIG_ADD_VAR(KABOOM5_HAMMING, int, 5, "Hamming distance of kaboom5's threshold, set to -1 to have adjustable, default is 5 for altruists.");
-  CONFIG_ADD_VAR(NO_MUT_INSTS, cString, "", "A list of the instruction symbols that should not be able to be mutated out.");
+  CONFIG_ADD_VAR(KABOOM_HAMMING, int, 0, "Hamming distance of kaboom's threshold, set to -1 to have adjustable, default is 0 for clone altruists.");
+  CONFIG_ADD_VAR(KABOOM1_HAMMING, int, 1, "Hamming distance of kaboom1's threshold, set to -1 to have adjustable, default is 1.");
+  CONFIG_ADD_VAR(KABOOM2_HAMMING, int, 2, "Hamming distance of kaboom2's threshold, set to -1 to have adjustable, default is 2.");
+  CONFIG_ADD_VAR(KABOOM3_HAMMING, int, 3, "Hamming distance of kaboom3's threshold, set to -1 to have adjustable, default is 3.");
+  CONFIG_ADD_VAR(KABOOM4_HAMMING, int, 4, "Hamming distance of kaboom4's threshold, set to -1 to have adjustable, default is 4.");
+  CONFIG_ADD_VAR(KABOOM5_HAMMING, int, 5, "Hamming distance of kaboom5's threshold, set to -1 to have adjustable, default is 5 for clan altruists.");
+  CONFIG_ADD_VAR(NO_MUT_INSTS, cString, "", "A list of the instruction symbols that should not be able to be mutated out, NOT checked for all mutation types.");
+  CONFIG_ADD_VAR(NOISY_QS_SD, double, .05, "The standard deviation for the gaussian distribution (mean = 1) that is multiplied with the kin percent found for NoisyQuorum inst");
 
   // -------- Geneology config options --------
   CONFIG_ADD_GROUP(GENEOLOGY_GROUP, "Geneology");
@@ -587,6 +594,7 @@ public:
   CONFIG_ADD_GROUP(ORGANISM_NETWORK_GROUP, "Organism Network Communication");
   CONFIG_ADD_VAR(NET_DROP_PROB, double, 0.0, "Message drop rate");
   CONFIG_ADD_VAR(NET_LOG_MESSAGES, int, 0, "Whether all messages are logged; 0=false (default), 1=true.");
+  CONFIG_ADD_VAR(NET_LOG_RETMESSAGES, int, 0, "Whether retrieved messages are logged; 0=false (default), 1=true.");
 
 
   // -------- Organism Messaging config options --------
@@ -720,7 +728,7 @@ public:
   CONFIG_ADD_VAR(DEADLY_BOUNDARIES, int, 0, "Are bounded grid border cell deadly? If == 1, orgs stepping onto boundary cells will disappear into oblivion (aka die)");
   CONFIG_ADD_VAR(STEP_COUNTING_ERROR, int, 0, "% chance a step is not counted as part of easterly/northerly travel.");
   CONFIG_ADD_VAR(USE_AVATARS, int, 0, "Set orgs to move & navigate in solo avatar worlds(1=yes, 2=yes, with org interactions).");
-  CONFIG_ADD_VAR(AVATAR_BIRTH, int, 0, "0 Same as parent \n 1 Random \n 2 Cell faced by parent avatar \n 3 next grid cell");
+  CONFIG_ADD_VAR(AVATAR_BIRTH, int, 0, "0 = Same as parent\n1 = Random\n2 = Cell faced by parent avatar\n3 = next grid cell\n4 = Center of the world");
   CONFIG_ADD_VAR(AVATAR_BIRTH_FACING, int, 0, "0 North \n 1 Random");
   CONFIG_ADD_VAR(TRACK_BIRTH_LOCS, int, 0, "Log and print locations for all births place.");
 
@@ -729,10 +737,13 @@ public:
   CONFIG_ADD_VAR(LOOK_DISABLE, int, 0, "0: none \n 1: input habitat register \n 2: input sight dist sought \n 3: input type of search (e.g. closest vs count vs total) \n 4: input resource/org id sought \n 5: output habitat used \n 6: output distance used\n 7: output search type used\n 8: output resource/org id used \n 9: output count (edible)\n 10: outptu amount/value seen\n 11: output id seen \n 12: output org forage target seen");
   CONFIG_ADD_VAR(LOOK_DISABLE_TYPE, int, 0, "0: predators \n 1: prey \n 2: both predators and prey");
   CONFIG_ADD_VAR(LOOK_DISABLE_COMBO, int, 0, "# 0: none \n # 1: return 'not found' for any food resource query \n # 2: return 'not found' for any looking-for-predator query \n # 3: return 'not found' for any looking-for-prey query");
+  CONFIG_ADD_VAR(PRED_CONFUSION, int, 0, "# If 1, pred will get random data returned to registers when seen prey with odds of 0.1 * n, where n = # neighbors that that prey has. \n If 2, pred will get random data returned to registers with odds of n/8, where n = # facings among neighbors that that prey has.");
   CONFIG_ADD_VAR(TRACK_LOOK_SETTINGS, int, 0, "# track (final) settings for look sensor use");
   CONFIG_ADD_VAR(TRACK_LOOK_OUTPUT, int, 0, "# track (final) output from sensor use");
   CONFIG_ADD_VAR(USE_DISPLAY, int, 0, "If 1, org display data is always 'on' (visible). If 2, org display is on and sensor does not set potential data.");
   CONFIG_ADD_VAR(USE_MIMICS, int, 0, "If 1, org's with forage target of 1 can show a deceptive ft number (as seen by other orgs via sensor)");
+  CONFIG_ADD_VAR(MIMIC_ODDS, double, 1.0, "Odds that a mimic will appear to other organisms as the thing it is mimicing.");
+  CONFIG_ADD_VAR(SET_FT_AT_BIRTH, int, 0, "Should offspring set forage target at birth? 0: No 1: Yes");
 
   // -------- Pheromone config options --------
   CONFIG_ADD_GROUP(PHEROMONE_GROUP, "Pheromone Settings");
@@ -804,6 +815,7 @@ public:
   CONFIG_ADD_VAR(MAX_PREY_BT, int, 0, "Population cap on number of prey (random prey will be removed when cap is exceeded) based on FT.");
   CONFIG_ADD_VAR(TRACK_GROUP_ATTACK_DETAILS, int, 0, "Track details around execution of EVERY group attack instructions for every update. \n  1 = as string in one file. \n  2 = as bits in new file for every update that this is on!");
   CONFIG_ADD_VAR(MARKING_EXPIRE_DATE, int, -1, " Number of updates markings in cells will remain effective on territory move.");
+  CONFIG_ADD_VAR(PREY_MUT_OFF, int, 0, "Turn off prey mutations in the exp hardware repro inst.");
 		
 
   // -------- Deme network config options --------

@@ -182,6 +182,7 @@ private:
 
   // --------  Population Stats  ---------
   int num_births;
+  int cumulative_births;
   int num_deaths;
   int num_breed_in;
   int num_breed_true;
@@ -209,6 +210,10 @@ private:
   int num_kaboom_kills;
   Apto::Array<int> hd_list;
   
+  // Quorum threshold stats
+  int num_stop_explode;
+  int ave_threshold;
+  int num_quorum;
   
   // ------- Division of Labor Stats ---------
   //TODO: Right place for this?
@@ -377,12 +382,15 @@ private:
   Apto::Array<int> topreactioncycles;
   Apto::Array<int> topreactionexecs;
   int topreac;
-  int topcycle;   
+  int topcycle;
   int topid;
   int topgenid;
   int toptarget;
   int topgroup;
   int topbirthud;
+  int topstart;
+  int toprepro;
+  bool firstnavtrace;
   Genome topgenome;
     
 public:
@@ -690,6 +698,7 @@ public:
   // Information retrieval section...
 
   int GetNumBirths() const          { return num_births; }
+  int GetCumulativeBirths() const   { return cumulative_births; }
   int GetNumDeaths() const          { return num_deaths; }
   int GetBreedIn() const            { return num_breed_in; }
   int GetBreedTrue() const          { return num_breed_true; }
@@ -819,6 +828,7 @@ public:
   void PrintBirthLocData(int org_idx);
   void PrintLookData(cString& string);
   void PrintLookDataOutput(cString& string);
+  void PrintLookEXDataOutput(cString& string);
 
   void PrintCountData(const cString& filename);
   void PrintThreadsData(const cString& filename);
@@ -878,18 +888,25 @@ public:
   void PrintMiniTraceReactions(cOrganism* org);
   void PrintMicroTraces(Apto::Array<char, Apto::Smart>& exec_trace, int birth_update, int org_id, int ft, int gen_id);
   void UpdateTopNavTrace(cOrganism* org, bool force_update = false);
-  void PrintTopNavTrace();
+  void SetNavTrace(bool use_first) { firstnavtrace = use_first; }
+  void PrintTopNavTrace(bool flush = false);
   void PrintReproData(cOrganism* org);
     
  // Kaboom stats
   void IncKaboom() { num_kabooms++; }
-    void IncKaboomKills() {num_kaboom_kills++;}
+  void IncKaboomKills() {num_kaboom_kills++;}
   void AddHamDistance(int distance) { hd_list.Push(distance); }
   void PrintKaboom(const cString& filename);
+  
+  //Quorum Sensing stats
+  void IncDontExplode() {num_stop_explode++;}
+  void IncQuorumThreshold(int thresh) {ave_threshold += thresh;}
+  void IncQuorumNum() {num_quorum++;}
+  void PrintQuorum(const cString& filename);
     
  // Division of Labor Stats
-    void IncJuvKilled() { juv_killed++; }
-    void IncGuardFail() {num_guard_fail++;}
+  void IncJuvKilled() { juv_killed++; }
+  void IncGuardFail() {num_guard_fail++;}
   
   // deme predicate stats
   void IncEventCount(int x, int y);
@@ -923,8 +940,12 @@ public:
   void PrintPredicatedMessages(const cString& filename);
   //! Log a message.
   void LogMessage(const cOrgMessage& msg, bool dropped, bool lost);
+  //! Log a retrieved message.
+  void LogRetMessage(const cOrgMessage& msg);
   //! Prints logged messages.
   void PrintMessageLog(const cString& filename);
+  //! Prints logged retrieved messages.
+  void PrintRetMessageLog(const cString& filename);
 
 protected:
   /*! List of all active message predicates.  The idea here is that the predicates,
@@ -942,6 +963,7 @@ protected:
   };
   typedef std::vector<message_log_entry_t> message_log_t; //!< Type for message log.
   message_log_t m_message_log; //!< Log for messages.
+  message_log_t m_retmessage_log; //!< Log for retrieved messages.
 
   // -------- End messaging support --------
 

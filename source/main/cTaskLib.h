@@ -202,6 +202,7 @@ private:
   double Task_Math1in_AN(cTaskContext& ctx) const;
   double Task_Math1in_AO(cTaskContext& ctx) const;
   double Task_Math1in_AP(cTaskContext& ctx) const;
+  double Task_Math1in_AS(cTaskContext& ctx) const;
 
   // Arbitrary 2-Input Math Tasks
   double Task_Math2in_AA(cTaskContext& ctx) const;
@@ -226,6 +227,10 @@ private:
   double Task_Math2in_AT(cTaskContext& ctx) const;
   double Task_Math2in_AU(cTaskContext& ctx) const;
   double Task_Math2in_AV(cTaskContext& ctx) const;
+  double Task_Math2in_AX(cTaskContext& ctx) const;
+  double Task_Math2in_AY(cTaskContext& ctx) const;
+  double Task_Math2in_AZ(cTaskContext& ctx) const;
+  double Task_Math2in_AAA(cTaskContext& ctx) const;
 
   // Arbitrary 3-Input Math Tasks
   double Task_Math3in_AA(cTaskContext& ctx) const;
@@ -241,6 +246,17 @@ private:
   double Task_Math3in_AK(cTaskContext& ctx) const;
   double Task_Math3in_AL(cTaskContext& ctx) const;
   double Task_Math3in_AM(cTaskContext& ctx) const;
+
+  //Fibonacci individual numbers tasks
+  double Task_Fib1(cTaskContext& ctx) const;
+  double Task_Fib2(cTaskContext& ctx) const;
+  double Task_Fib4(cTaskContext& ctx) const;
+  double Task_Fib5(cTaskContext& ctx) const;
+  double Task_Fib6(cTaskContext& ctx) const;
+  double Task_Fib7(cTaskContext& ctx) const;
+  double Task_Fib8(cTaskContext& ctx) const;
+  double Task_Fib9(cTaskContext& ctx) const;
+  double Task_Fib10(cTaskContext& ctx) const;
   
   // Matching Tasks
   void Load_MatchStr(const cString& name, const cString& argstr, cEnvReqs& envreqs, Feedback& feedback);
@@ -326,7 +342,8 @@ private:
   void Load_ConsumeTargetNor(const cString& name, const cString& argstr, cEnvReqs& envreqs, Feedback& feedback);
   void Load_ConsumeTargetXor(const cString& name, const cString& argstr, cEnvReqs& envreqs, Feedback& feedback);
   void Load_ConsumeTargetEqu(const cString& name, const cString& argstr, cEnvReqs& envreqs, Feedback& feedback);
-  double Task_ConsumeTarget(cTaskContext& ctx) const; 
+  void Load_MoveFT(const cString& name, const cString& argstr, cEnvReqs& envreqs, Feedback& feedback);
+  double Task_ConsumeTarget(cTaskContext& ctx) const;
   double Task_ConsumeTargetEcho(cTaskContext& ctx) const;
   double Task_ConsumeTargetNand(cTaskContext& ctx) const;
   double Task_ConsumeTargetAnd(cTaskContext& ctx) const;
@@ -336,6 +353,11 @@ private:
   double Task_ConsumeTargetNor(cTaskContext& ctx) const;
   double Task_ConsumeTargetXor(cTaskContext& ctx) const;
   double Task_ConsumeTargetEqu(cTaskContext& ctx) const;
+  double Task_MoveFT(cTaskContext& ctx) const;
+  
+  // Explosion Task
+  void Load_Exploded(const cString& name, const cString& argstr, cEnvReqs& envreqs, Feedback& feedback);
+  double Task_Exploded(cTaskContext& ctx) const;
 
   double Task_XorMax(cTaskContext& ctx) const;
 

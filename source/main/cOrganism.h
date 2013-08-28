@@ -240,7 +240,7 @@ public:
   int GetFacedCellID() { assert(m_interface); return m_interface->GetFacedCellID(); }  // Returns the faced cell of this organism.
   int GetFacedDir() { assert(m_interface); return m_interface->GetFacedDir(); }  // Returns the human interpretable facing of this org.
   int GetNeighborCellContents() const { return m_interface->GetNeighborCellContents(); }
-  void Rotate(int direction) { m_interface->Rotate(direction); }
+  void Rotate(cAvidaContext& ctx, int direction) { m_interface->Rotate(ctx, direction); }
 
   int GetInputAt(int i) { return m_interface->GetInputAt(i); }
   int GetNextInput() { return m_interface->GetInputAt(m_input_pointer); }
@@ -498,11 +498,11 @@ public:
 public:
   typedef std::set<int> Neighborhood; //!< Typedef for a neighborhood snapshot.
   //! Get the current neighborhood.
-  Neighborhood GetNeighborhood();
+  Neighborhood GetNeighborhood(cAvidaContext& ctx);
   //! Loads this organism's current neighborhood into memory.
-  void LoadNeighborhood();
+  void LoadNeighborhood(cAvidaContext& ctx);
   //! Has the current neighborhood changed from what is in memory?
-  bool HasNeighborhoodChanged();
+  bool HasNeighborhoodChanged(cAvidaContext& ctx);
 
 protected:
   //! Initialize neighborhood support.
@@ -596,7 +596,7 @@ public:
   
   int GetForageTarget() const { return m_forage_target; }
   int GetShowForageTarget() const { return m_show_ft; }
-  void SetForageTarget(cAvidaContext& ctx, int forage_target);
+  void SetForageTarget(cAvidaContext& ctx, int forage_target, bool inject = false);
   void SetPredFT(cAvidaContext& ctx) { SetForageTarget(ctx, -2); }
   void SetTopPredFT(cAvidaContext& ctx) { SetForageTarget(ctx, -3); }
   bool IsPreyFT() { return m_forage_target > -2; }
@@ -631,6 +631,9 @@ public:
   void IncAmountDeposited(double amount) { m_amount_deposited = m_amount_deposited + amount; } 
   int GetNumDeposits() { return m_num_deposits; }
   double GetAmountDeposited() { return m_amount_deposited; }
+  
+  bool GetQuorum() {return m_quorum;}
+  void SetQuorum(bool quorum) {m_quorum = quorum;}
   
 protected:
   // The organism's own raw materials
@@ -676,6 +679,8 @@ protected:
     int m_num_guard;
     int m_num_deposits;
     double m_amount_deposited;
+  
+  bool m_quorum;
   
   /*! Contains all the different data structures needed to
   track strings, production of strings, and donation/trade

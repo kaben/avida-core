@@ -1008,7 +1008,7 @@ public:
         
         // Find a random, unoccupied cell to use. Assumes one exists.
         do {
-          target_cellr = m_world->GetRandom().GetInt(0, deme_size-1);
+          target_cellr = ctx.GetRandom().GetInt(0, deme_size-1);
           target_cell = m_world->GetPopulation().GetDeme(i).GetCellID(target_cellr);
         } while (m_world->GetPopulation().GetCell(target_cell).IsOccupied());
         
@@ -1084,7 +1084,7 @@ public:
     
     while (num_to_kill > 0)
     {
-      int target_cell = m_world->GetRandom().GetInt(0, pop.GetSize() - 1);
+      int target_cell = ctx.GetRandom().GetInt(0, pop.GetSize() - 1);
       cPopulationCell& cell = pop.GetCell(target_cell);                                         
       if (cell.IsOccupied())
       {
@@ -1160,7 +1160,7 @@ public:
       cell_res = m_world->GetPopulation().GetCellResources(i, ctx);
       
       for (int j = 0; j < cell_res.GetSize(); j++) {
-        if ((resource_lib.GetResource(j)->GetHabitat() == 4 ||resource_lib.GetResource(j)->GetHabitat() == 3) && cell_res[j] > 0 && m_world->GetConfig().MIN_PREY.Get() < 0 && m_world->GetStats().GetNumPreyCreatures() <= abs(m_world->GetConfig().MIN_PREY.Get())) {
+        if ((resource_lib.GetResource(j)->GetHabitat() == 4 ||resource_lib.GetResource(j)->GetHabitat() == 3) && cell_res[j] > 0) {
           // for every x juvs, we require 1 adult...otherwise use killprob on the rest
           Apto::Array<cOrganism*> cell_avs = cell.GetCellAVs();    // cell avs are already randomized
           Apto::Array<cOrganism*> juvs;
@@ -2148,14 +2148,14 @@ public:
   static const cString GetDescription() { return "Arguments: [num_cells=deme_size]"; }
   
 	//! Process this event, setting the requested number of cell's data to a random value.
-  virtual void Process(cAvidaContext&) {
+  virtual void Process(cAvidaContext& ctx) {
 		for(int i=0; i<m_world->GetPopulation().GetNumDemes(); ++i) {
       cDeme& deme = m_world->GetPopulation().GetDeme(i);
 			zero_cell_data(deme);
 			if((_num_cells == 0) || (_num_cells >= deme.GetSize())) {
 				// Assign random data to each cell:
 				for(int j=0; j<deme.GetSize(); ++j) {
-					int d = m_world->GetRandom().GetInt(INT_MAX);
+					int d = ctx.GetRandom().GetInt(INT_MAX);
 					deme.GetCell(j).SetCellData(d);
 					// Save that data by deme in the map:
 					deme_to_id[deme.GetID()].insert(d);
@@ -2163,8 +2163,8 @@ public:
 			} else {
 				// Assign random data to exactly num_cells cells, with replacement:
 				for(int j=0; j<_num_cells; ++j) {
-					int cell = m_world->GetRandom().GetInt(deme.GetSize());
-					int d = m_world->GetRandom().GetInt(INT_MAX);
+					int cell = ctx.GetRandom().GetInt(deme.GetSize());
+					int d = ctx.GetRandom().GetInt(INT_MAX);
 					deme.GetCell(cell).SetCellData(d);
 					// Save that data by deme in the map:
 					deme_to_id[deme.GetID()].insert(d);
@@ -2754,14 +2754,14 @@ protected:
 			max_data = *cAssignRandomCellData::GetDataInDeme(deme).rbegin() - 1;
 		}
 		cAssignRandomCellData::CellIDList cell_ids = 
-		cAssignRandomCellData::ReplaceCellData(support.second, m_world->GetRandom().GetInt(min_data, max_data), deme);
+		cAssignRandomCellData::ReplaceCellData(support.second, ctx.GetRandom().GetInt(min_data, max_data), deme);
 		
 		// Now reset the others:
 		for(int i=1; i<_replace; ++i) {
-			int cell_id = m_world->GetRandom().GetInt(deme.GetSize());
+			int cell_id = ctx.GetRandom().GetInt(deme.GetSize());
 			int cell_data = deme.GetCell(cell_id).GetCellData();
 			cAssignRandomCellData::CellIDList extra_cell_ids = 
-			cAssignRandomCellData::ReplaceCellData(cell_data, m_world->GetRandom().GetInt(min_data, max_data), deme);
+			cAssignRandomCellData::ReplaceCellData(cell_data, ctx.GetRandom().GetInt(min_data, max_data), deme);
 			cell_ids.insert(cell_ids.end(), extra_cell_ids.begin(), extra_cell_ids.end());
 		}
     
@@ -2816,15 +2816,15 @@ public:
   void Process(cAvidaContext& ctx) {
     if(_p_kill > 0.0) {
       for(int i=0; i<m_world->GetPopulation().GetNumDemes(); ++i) {
-        if(m_world->GetRandom().P(_p_kill)) {
+        if(ctx.GetRandom().P(_p_kill)) {
           cDeme& deme = m_world->GetPopulation().GetDeme(i);
           
           // Pick a cell at random, kill the occupant (if any), reset the cell data, and re-seed from the germline.
-          cPopulationCell& cell = deme.GetCell(m_world->GetRandom().GetInt(deme.GetSize()));
+          cPopulationCell& cell = deme.GetCell(ctx.GetRandom().GetInt(deme.GetSize()));
           
           if(_update_cell_data) {
             // There are no restrictions on the ID for this cell:
-            cAssignRandomCellData::ReplaceCellData(cell, m_world->GetRandom().GetInt(INT_MAX), deme);
+            cAssignRandomCellData::ReplaceCellData(cell, ctx.GetRandom().GetInt(INT_MAX), deme);
           }
           
           // Kill any organism in that cell, re-seed the from the germline, and do the post-injection magic:
@@ -4360,7 +4360,7 @@ public:
     long cells_empty = 0;
     
     for(int i=0; i < m_numkills; i++) {
-      target_cell = m_world->GetRandom().GetInt(0, m_world->GetPopulation().GetSize()-1);
+      target_cell = ctx.GetRandom().GetInt(0, m_world->GetPopulation().GetSize()-1);
       level = m_world->GetPopulation().GetResourceCount().GetSpatialResource(res_id).GetAmount(target_cell); 
       cells_scanned++;
       
@@ -4444,7 +4444,7 @@ public:
     
     for (int i = 0; i < m_numradii; i++) {
       
-      int target_cell = m_world->GetRandom().GetInt(0, pop.GetSize()-1);
+      int target_cell = ctx.GetRandom().GetInt(0, pop.GetSize()-1);
       double level = pop.GetResourceCount().GetSpatialResource(res_id).GetAmount(target_cell); 
       
       if(level < m_threshold) {
@@ -4557,7 +4557,7 @@ public:
     
     for (int i = 0; i < m_numradii; i++) {
       
-      int target_cell = m_world->GetRandom().GetInt(0, pop.GetSize()-1);
+      int target_cell = ctx.GetRandom().GetInt(0, pop.GetSize()-1);
       resourcesum.Clear();
       
       const int current_row = target_cell / world_x;
@@ -4702,7 +4702,7 @@ public:
     
     for (int i = 0; i < m_numradii; i++) {
       
-      int target_cell = m_world->GetRandom().GetInt(0, pop.GetSize()-1);
+      int target_cell = ctx.GetRandom().GetInt(0, pop.GetSize()-1);
       resourcesum.Clear();
       
       // Get the level of adversity.  Bounded by [0,1]
@@ -4839,7 +4839,7 @@ public:
 		
 		for (int i = 0; i < m_numradii; i++) {
 			
-			int target_cell = m_world->GetRandom().GetInt(0, pop.GetSize()-1);
+			int target_cell = ctx.GetRandom().GetInt(0, pop.GetSize()-1);
 			const int current_row = target_cell / world_x;
 			const int current_col = target_cell % world_x;
 			
@@ -5051,7 +5051,7 @@ public:
   void Process(cAvidaContext& ctx) {
 		for(int i=0; i<m_world->GetPopulation().GetSize(); ++i) {
 			cOrganism* org = m_world->GetPopulation().GetCell(i).GetOrganism();			
-			if(org && (m_donation_p > 0.0) && m_world->GetRandom().P(m_donation_p)) {
+			if(org && (m_donation_p > 0.0) && ctx.GetRandom().P(m_donation_p)) {
 				org->GetOrgInterface().DoHGTDonation(ctx);
 			}
 		}
@@ -5119,7 +5119,7 @@ public:
         deme.AdjustResource(ctx, resid, (-1 * res.Get(ctx, resid)));
         
         //Pick a deme to move to
-        int target_demeid = m_world->GetRandom().GetInt(0, m_world->GetConfig().NUM_DEMES.Get()-1);
+        int target_demeid = ctx.GetRandom().GetInt(0, m_world->GetConfig().NUM_DEMES.Get()-1);
         cDeme& target_deme = m_world->GetPopulation().GetDeme(target_demeid);
         int target_deme_size = target_deme.GetWidth() * target_deme.GetHeight();
         
@@ -5130,13 +5130,13 @@ public:
           
           int counter = 0;
           do {
-            src_cellid = m_world->GetRandom().GetInt(0, (deme.GetWidth() * deme.GetHeight())-1);
+            src_cellid = ctx.GetRandom().GetInt(0, (deme.GetWidth() * deme.GetHeight())-1);
             counter++;
           } while((counter < deme_size) && (!deme.GetCell(src_cellid).IsOccupied()));
           
           counter = 0;
           do {
-            dest_cellid = m_world->GetRandom().GetInt(0, target_deme_size - 1);
+            dest_cellid = ctx.GetRandom().GetInt(0, target_deme_size - 1);
             counter++;
           } while((counter < target_deme_size) && (target_deme.GetCell(dest_cellid).IsOccupied())); 
           
@@ -5384,6 +5384,25 @@ public:
   }
 };
 
+class cActionPrintNavTrace : public cAction
+{
+private:
+  
+public:
+  cActionPrintNavTrace(cWorld* world, const cString& args, Feedback& feedback)
+  : cAction(world, args)
+  {
+  }
+  
+  static const cString GetDescription() { return "Arguments: ''"; }
+
+  void Process(cAvidaContext& ctx)
+  {
+    m_world->GetStats().SetNavTrace(true);
+    m_world->GetPopulation().SetTopNavQ();
+  }
+};
+
 /* Force Printing of current TopNacTrace even if orgs still being tracked. */
 class cActionFlushTopNavTrace : public cAction
 {
@@ -5399,7 +5418,7 @@ public:
 
   void Process(cAvidaContext& ctx)
   { 
-    m_world->GetStats().PrintTopNavTrace();
+    m_world->GetStats().PrintTopNavTrace(true);
   }
 };
 
@@ -5454,6 +5473,38 @@ public:
 		cInstSet& is = m_world->GetHardwareManager().GetInstSet("(default)");
 		Instruction inst = is.GetInst(m_inst_name);
 		is.SetRedundancy(inst, m_redundancy);
+	}
+};
+
+
+/*
+ Modifies an instruction's prob of failure during a run  */
+class cActionSetProbFail : public cAction
+{
+private:
+	cString m_inst_name;
+	double m_prob;
+public:
+	cActionSetProbFail(cWorld* world, const cString& args, Feedback&) : cAction(world, args)
+	{
+		cString largs(args);
+		m_inst_name = largs.PopWord();
+		
+		//Make sure that the instruction the user has specified is in the instruction set
+		assert(world->GetHardwareManager().GetDefaultInstSet().InstInSet(m_inst_name));
+    
+		//Get the new redundancy
+		m_prob = largs.PopWord().AsInt();
+	}
+	
+	static const cString GetDescription() { return "Arguments: <char instruction> <int prob_fail>"; }
+	
+	void Process(cAvidaContext& ctx)
+	{
+		//cInstSet& is = m_world->GetHardwareManager().GetInstSet(m_world->GetHardwareManager().GetDefaultInstSet().GetInstSetName());
+		cInstSet& is = m_world->GetHardwareManager().GetInstSet("(default)");
+		Instruction inst = is.GetInst(m_inst_name);
+		is.SetProbFail(inst, m_prob);
 	}
 };
 
@@ -5513,6 +5564,7 @@ void RegisterPopulationActions(cActionLibrary* action_lib)
   action_lib->Register<cActionFlash>("Flash");
   
   action_lib->Register<cActionSetRedundancy>("SetRedundancy");
+  action_lib->Register<cActionSetProbFail>("SetProbFail");
 	
   /****AbstractCompeteDemes sub-classes****/
 	
@@ -5571,6 +5623,7 @@ void RegisterPopulationActions(cActionLibrary* action_lib)
   action_lib->Register<cActionLoadMiniTraceQ>("LoadMiniTraceQ");
   action_lib->Register<cActionPrintReproData>("PrintReproData");
   action_lib->Register<cActionPrintTopNavTrace>("PrintTopNavTrace");
+  action_lib->Register<cActionPrintTopNavTrace>("PrintNavTrace");
   action_lib->Register<cActionFlushTopNavTrace>("FlushTopNavTrace");
 
   action_lib->Register<cActionRemovePredators>("RemovePredators");

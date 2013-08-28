@@ -90,6 +90,7 @@ STATS_OUT_FILE(PrintVarianceData,           variance.dat        );
 STATS_OUT_FILE(PrintCountData,              count.dat           );
 STATS_OUT_FILE(PrintMessageData,            message.dat         );
 STATS_OUT_FILE(PrintMessageLog,             message_log.dat     );
+STATS_OUT_FILE(PrintRetMessageLog,          retmessage_log.dat  );
 STATS_OUT_FILE(PrintInterruptData,          interrupt.dat       );
 STATS_OUT_FILE(PrintTotalsData,             totals.dat          );
 STATS_OUT_FILE(PrintTasksData,              tasks.dat           );
@@ -200,6 +201,7 @@ STATS_OUT_FILE(PrintStringMatchData,         stringmatch.dat);
 
 // kabooms
 STATS_OUT_FILE(PrintKaboom, kabooms.dat);
+STATS_OUT_FILE(PrintQuorum, threshold.dat);
 
 // group formation
 STATS_OUT_FILE(PrintGroupsFormedData,         groupformation.dat);
@@ -1111,31 +1113,29 @@ public:
     }
     
     Apto::Array<int, Apto::Smart> birth_groups_checked;
-    Systematics::GroupPtr bg = it->Next();
     
     for (int i = 0; i < num_groups; i++) {
+      Systematics::GroupPtr bg = it->Next();
       bool already_used = false;
+      
+      if (!bg) break;
+
       if (bg && ((bool)Apto::StrAs(bg->Properties().Get("threshold")) || i == 0)) {
         int last_birth_group_id = Apto::StrAs(bg->Properties().Get("last_group_id")); 
         int last_birth_cell = Apto::StrAs(bg->Properties().Get("last_birth_cell"));
         int last_birth_forager_type = Apto::StrAs(bg->Properties().Get("last_forager_type")); 
         if (i != 0) {
           for (int j = 0; j < birth_groups_checked.GetSize(); j++) {
-            if (last_birth_group_id == birth_groups_checked[j]) { 
-              already_used = true; 
+            if (last_birth_group_id == birth_groups_checked[j]) {
+              already_used = true;
               i--;
-              break; 
+              break;
             }
           }
         }
         if (!already_used) birth_groups_checked.Push(last_birth_group_id);
-        if (already_used) {
-          if (bg == it->Next()) break; // no more to check
-          else {
-            bg = it->Next();
-            continue;
-          }
-        }
+        if (already_used) continue;
+        
         cString filename(m_filename);
         if (filename == "") filename.Set("archive/grp%d_ft%d_%s.org", last_birth_group_id, last_birth_forager_type, (const char*)bg->Properties().Get("name").StringValue());
         else filename = filename.Set(filename + "grp%d_ft%d", last_birth_group_id, last_birth_forager_type); 
@@ -1146,9 +1146,6 @@ public:
         cTestCPU* testcpu = m_world->GetHardwareManager().CreateTestCPU(ctx2);
         testcpu->PrintGenome(ctx2, Genome(bg->Properties().Get("genome")), filename, m_world->GetStats().GetUpdate(), true, last_birth_cell, last_birth_group_id, last_birth_forager_type);
         delete testcpu;
-        
-        if (bg == it->Next()) break; // no more to check
-        else bg = it->Next();
       }
     }
   }
@@ -1180,10 +1177,13 @@ public:
     for(itr = fts_avail.begin();itr!=fts_avail.end();itr++) if (*itr != -1 && *itr != -2 && *itr != -3) num_fts++;
     
     Apto::Array<int, Apto::Smart> birth_forage_types_checked;
-    Systematics::GroupPtr bg = it->Next();
     
     for (int i = 0; i < num_fts; i++) {
       bool already_used = false;
+      Systematics::GroupPtr bg = it->Next();
+      
+      if (!bg) break;
+      
       if (bg && ((bool)Apto::StrAs(bg->Properties().Get("threshold")) || i == 0)) {
         int last_birth_group_id = Apto::StrAs(bg->Properties().Get("last_group_id")); 
         int last_birth_cell = Apto::StrAs(bg->Properties().Get("last_birth_cell"));
@@ -1198,13 +1198,9 @@ public:
           }
         }
         if (!already_used) birth_forage_types_checked.Push(last_birth_forager_type);
-        if (already_used) {
-          if (bg == it->Next()) break; // no more to check
-          else {
-            bg = it->Next();
-            continue;
-          }
-        }
+        if (already_used) continue;
+        
+        
         cString filename(m_filename);
         if (filename == "") filename.Set("archive/ft%d_grp%d_%s.org", last_birth_forager_type, last_birth_group_id, (const char*)bg->Properties().Get("name").StringValue());
         else filename = filename.Set(filename + ".ft%d_grp%d", last_birth_forager_type, last_birth_group_id); 
@@ -1215,9 +1211,6 @@ public:
         cTestCPU* testcpu = m_world->GetHardwareManager().CreateTestCPU(ctx2);
         testcpu->PrintGenome(ctx2, Genome(bg->Properties().Get("genome")), filename, m_world->GetStats().GetUpdate(), true, last_birth_cell, last_birth_group_id, last_birth_forager_type);
         delete testcpu;
-
-        if (bg == it->Next()) break; // no more to check
-        else bg = it->Next();
       }
     }
   }
@@ -4200,6 +4193,89 @@ public:
   }
 };
 
+class cActionDumpHostGenotypeList : public cAction
+{
+private:
+  cString m_filename;
+  
+public:
+  cActionDumpHostGenotypeList(cWorld* world, const cString& args, Feedback&) : cAction(world, args), m_filename("")
+  {
+    cString largs(args);
+    if (largs.GetSize()) m_filename = largs.PopWord();
+  }
+  static const cString GetDescription() { return "Arguments: [string fname='']"; }
+  void Process(cAvidaContext&)
+  {
+    cString filename(m_filename);
+    if (filename == "") filename.Set("host_genome_list.%d.dat", m_world->GetStats().GetUpdate());
+    Avida::Output::FilePtr df = Avida::Output::File::CreateWithPath(m_world->GetNewWorld(), (const char*)filename);
+    ofstream& fp = df->OFStream();
+    
+    cPopulation* pop = &m_world->GetPopulation();
+    
+    for (int i = 0; i < pop->GetWorldX(); i++) {
+      for (int j = 0; j < pop->GetWorldY(); j++) {
+        cString genome_seq("");
+        int cell_num = j * pop->GetWorldX() + i;
+        if (pop->GetCell(cell_num).IsOccupied() == true)
+        {
+          cOrganism* organism = pop->GetCell(cell_num).GetOrganism();
+          Genome host_genome(organism->Properties().Get("genome"));
+          ConstInstructionSequencePtr seq;
+          seq.DynamicCastFrom(host_genome.Representation());
+          genome_seq = seq->AsString();
+          fp << genome_seq << endl;
+        }
+      }
+    }
+  }
+};
+
+class cActionDumpParasiteGenotypeList : public cAction
+{
+private:
+  cString m_filename;
+  
+public:
+  cActionDumpParasiteGenotypeList(cWorld* world, const cString& args, Feedback&) : cAction(world, args), m_filename("")
+  {
+    cString largs(args);
+    if (largs.GetSize()) m_filename = largs.PopWord();
+  }
+  static const cString GetDescription() { return "Arguments: [string fname='']"; }
+  void Process(cAvidaContext&)
+  {
+    cString filename(m_filename);
+    if (filename == "") filename.Set("parasite_genome_list.%d.dat", m_world->GetStats().GetUpdate());
+    Avida::Output::FilePtr df = Avida::Output::File::CreateWithPath(m_world->GetNewWorld(), (const char*)filename);
+    ofstream& fp = df->OFStream();
+    
+    cPopulation* pop = &m_world->GetPopulation();
+    
+    for (int i = 0; i < pop->GetWorldX(); i++) {
+      for (int j = 0; j < pop->GetWorldY(); j++) {
+        cString genome_seq("");
+        int cell_num = j * pop->GetWorldX() + i;
+        if (pop->GetCell(cell_num).IsOccupied() == true)
+        {
+          cOrganism* organism = pop->GetCell(cell_num).GetOrganism();
+          if (organism->GetNumParasites() > 0)
+          {
+            Apto::Array<Systematics::UnitPtr> parasites = organism->GetParasites();
+            Apto::SmartPtr<cParasite, Apto::InternalRCObject> parasite;
+            parasite.DynamicCastFrom(parasites[0]);
+            genome_seq = parasite->UnitGenome().Representation()->AsString();
+            fp << genome_seq << endl;
+
+          }
+        }
+      }
+    }
+  }
+};
+
+
 class cActionDumpParasiteGenotypeGrid : public cAction
 {
 private:
@@ -4275,7 +4351,6 @@ public:
     }
   }
 };
-
 
 class cActionDumpReceiverGrid : public cAction
 {
@@ -5095,6 +5170,7 @@ void RegisterPrintActions(cActionLibrary* action_lib)
   action_lib->Register<cActionPrintCountData>("PrintCountData");
   action_lib->Register<cActionPrintMessageData>("PrintMessageData");
   action_lib->Register<cActionPrintMessageLog>("PrintMessageLog");
+  action_lib->Register<cActionPrintRetMessageLog>("PrintRetMessageLog");
   action_lib->Register<cActionPrintInterruptData>("PrintInterruptData");
   action_lib->Register<cActionPrintTotalsData>("PrintTotalsData");
   action_lib->Register<cActionPrintThreadsData>("PrintThreadsData");
@@ -5190,6 +5266,7 @@ void RegisterPrintActions(cActionLibrary* action_lib)
     
   // kabooms output file
   action_lib->Register<cActionPrintKaboom>("PrintKaboom");
+  action_lib->Register<cActionPrintQuorum>("PrintQuorum");
   
   // deme output files
   action_lib->Register<cActionPrintDemeAllStats>("PrintDemeAllStats");
@@ -5320,6 +5397,11 @@ void RegisterPrintActions(cActionLibrary* action_lib)
   action_lib->Register<cActionDumpGenomeLengthGrid>("DumpGenomeLengthGrid");
   action_lib->Register<cActionDumpGenotypeGrid>("DumpGenotypeGrid");
   action_lib->Register<cActionDumpParasiteGenotypeGrid>("DumpParasiteGenotypeGrid");
+  
+  //Dump Genotype Lists
+  action_lib->Register<cActionDumpHostGenotypeList>("DumpHostGenotypeList");
+  action_lib->Register<cActionDumpParasiteGenotypeList>("DumpParasiteGenotypeList");
+
   
   action_lib->Register<cActionPrintNumOrgsKilledData>("PrintNumOrgsKilledData");
   action_lib->Register<cActionPrintMigrationData>("PrintMigrationData");

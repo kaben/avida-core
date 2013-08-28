@@ -203,6 +203,7 @@ cTaskEntry* cTaskLib::AddTask(const cString& name, const cString& info, cEnvReqs
   else if (name == "math_1AN") NewTask(name, "Math 1AN (X/4)", &cTaskLib::Task_Math1in_AN);  
   else if (name == "math_1AO") NewTask(name, "Math 1AO (X-6)", &cTaskLib::Task_Math1in_AO);  
   else if (name == "math_1AP") NewTask(name, "Math 1AP (X-7)", &cTaskLib::Task_Math1in_AP);
+  else if (name == "math_1AS") NewTask(name, "Math 1AS (3Y)", &cTaskLib::Task_Math1in_AS);
   
   // Arbitrary 2-Input Math Tasks
   if (name == "math_2AA") NewTask(name, "Math 2AA (sqrt(X+Y))", &cTaskLib::Task_Math2in_AA);  
@@ -227,6 +228,10 @@ cTaskEntry* cTaskLib::AddTask(const cString& name, const cString& info, cEnvReqs
   else if (name == "math_2AT") NewTask(name, "Math 2AT (X+3Y)", &cTaskLib::Task_Math2in_AT);
   else if (name == "math_2AU") NewTask(name, "Math 2AU (2X+3Y)", &cTaskLib::Task_Math2in_AU);
   else if (name == "math_2AV") NewTask(name, "Math 2AV (XY^2)", &cTaskLib::Task_Math2in_AV);
+  else if (name == "math_2AX") NewTask(name, "Math 2AX (X+3Y)", &cTaskLib::Task_Math2in_AX);
+  else if (name == "math_2AY") NewTask(name, "Math 2AY (2A+B)", &cTaskLib::Task_Math2in_AY);
+  else if (name == "math_2AZ") NewTask(name, "Math 2AZ (4A+6B)", &cTaskLib::Task_Math2in_AZ);
+  else if (name == "math_2AAA") NewTask(name, "Math 2AAA (3A-2B)", &cTaskLib::Task_Math2in_AAA);
   
   // Arbitrary 3-Input Math Tasks
   if (name == "math_3AA")      NewTask(name, "Math 3AA (X^2+Y^2+Z^2)", &cTaskLib::Task_Math3in_AA);  
@@ -242,6 +247,17 @@ cTaskEntry* cTaskLib::AddTask(const cString& name, const cString& info, cEnvReqs
   else if (name == "math_3AK") NewTask(name, "Math 3AK ((X+Y)^2+(Y+Z)^2+(Z+X)^2)", &cTaskLib::Task_Math3in_AK);  
   else if (name == "math_3AL") NewTask(name, "Math 3AL ((X-Y)^2+(X-Z)^2)", &cTaskLib::Task_Math3in_AL);  
   else if (name == "math_3AM") NewTask(name, "Math 3AM ((X+Y)^2+(Y+Z)^2)", &cTaskLib::Task_Math3in_AM);  
+
+  //Fibonacci individual tasks
+  if (name == "fib_1") NewTask(name, "First Fib number (0)", &cTaskLib::Task_Fib1);
+  else if (name == "fib_2") NewTask(name, "Second and Third Fib number (1)", &cTaskLib::Task_Fib2);
+  else if (name == "fib_4") NewTask(name, "Fourth Fib number (2)", &cTaskLib::Task_Fib4);
+  else if (name == "fib_5") NewTask(name, "Fifth Fib number (3)", &cTaskLib::Task_Fib5);
+  else if (name == "fib_6") NewTask(name, "Sixth Fib number (5)", &cTaskLib::Task_Fib6);
+  else if (name == "fib_7") NewTask(name, "Seventh Fib number (8)", &cTaskLib::Task_Fib7);
+  else if (name == "fib_8") NewTask(name, "Eighth Fib number (13)", &cTaskLib::Task_Fib8);
+  else if (name == "fib_9") NewTask(name, "Ninth Fib number (21)", &cTaskLib::Task_Fib9);
+  else if (name == "fib_10") NewTask(name, "Tenth Fib number (34)", &cTaskLib::Task_Fib10);
   
   // Matching Tasks
   if (name == "matchstr") Load_MatchStr(name, info, envreqs, feedback);
@@ -311,6 +327,10 @@ cTaskEntry* cTaskLib::AddTask(const cString& name, const cString& info, cEnvReqs
   else if (name == "eat-target-nor") Load_ConsumeTargetNor(name, info, envreqs, feedback);
   else if (name == "eat-target-xor") Load_ConsumeTargetXor(name, info, envreqs, feedback);
   else if (name == "eat-target-equ") Load_ConsumeTargetEqu(name, info, envreqs, feedback);
+  else if (name == "move-ft") Load_MoveFT(name, info, envreqs, feedback);
+  
+  //Explosions
+  if (name == "exploded") Load_Exploded(name, info, envreqs, feedback);
 
   // String matching
   if (name == "all-ones") Load_AllOnes(name, info, envreqs, feedback);
@@ -1286,6 +1306,18 @@ double cTaskLib::Task_Math1in_AP(cTaskContext& ctx) const //(X-7)
   return 0.0;
 }
 
+double cTaskLib::Task_Math1in_AS(cTaskContext& ctx) const //3Y
+{
+  const tBuffer<int>& input_buffer = ctx.GetInputBuffer();
+  const int test_output = ctx.GetOutputBuffer()[0];
+  const int input_size = input_buffer.GetNumStored();
+
+  for (int i = 0; i < input_size; i ++) {
+    if (test_output == input_buffer[i] * 3) return 1.0;
+  }
+  return 0.0;
+}
+
 double cTaskLib::Task_Math2in_AA(cTaskContext& ctx) const //(sqrt(X+Y))
 {
   const tBuffer<int>& input_buffer = ctx.GetInputBuffer();
@@ -1644,6 +1676,70 @@ double cTaskLib::Task_Math2in_AV(cTaskContext& ctx) const //(XY^2)
   return 0.0;
 }
 
+double cTaskLib::Task_Math2in_AX(cTaskContext& ctx) const //(X+3Y)
+{
+  const tBuffer<int>& input_buffer = ctx.GetInputBuffer();
+  const int test_output = ctx.GetOutputBuffer()[0];
+  const int input_size = input_buffer.GetNumStored();
+
+  for (int i = 0; i < input_size; i++) {
+    for (int j = 0; j < input_size; j++) {
+      if (i == j) continue;
+      if (test_output == input_buffer[i] + 3*input_buffer[j])
+        return 1.0;
+    }
+  }
+  return 0.0;
+
+}
+
+double cTaskLib::Task_Math2in_AY(cTaskContext& ctx) const //(2A+B)
+{
+  const tBuffer<int>& input_buffer = ctx.GetInputBuffer();
+  const int test_output = ctx.GetOutputBuffer()[0];
+  const int input_size = input_buffer.GetNumStored();
+
+  for (int i = 0; i < input_size; i++) {
+    for (int j = 0; j < input_size; j++) {
+      if (i == j) continue;
+      if (test_output == 2*input_buffer[i] + input_buffer[j])
+        return 1.0;
+    }
+  }
+  return 0.0;
+}
+
+double cTaskLib::Task_Math2in_AZ(cTaskContext& ctx) const //(4A+6B)
+{
+  const tBuffer<int>& input_buffer = ctx.GetInputBuffer();
+  const int test_output = ctx.GetOutputBuffer()[0];
+  const int input_size = input_buffer.GetNumStored();
+
+  for (int i = 0; i < input_size; i++) {
+    for (int j = 0; j < input_size; j++) {
+      if (i == j) continue;
+      if (test_output == 4*input_buffer[i] + 6*input_buffer[j])
+        return 1.0;
+    }
+  }
+  return 0.0;
+}
+double cTaskLib::Task_Math2in_AAA(cTaskContext& ctx) const //(3A-2B)
+{
+  const tBuffer<int>& input_buffer = ctx.GetInputBuffer();
+  const int test_output = ctx.GetOutputBuffer()[0];
+  const int input_size = input_buffer.GetNumStored();
+
+  for (int i = 0; i < input_size; i++) {
+    for (int j = 0; j < input_size; j++) {
+      if (i == j) continue;
+      if (test_output == 3*input_buffer[i] - 2*input_buffer[j])
+        return 1.0;
+    }
+  }
+  return 0.0;
+}
+
 double cTaskLib::Task_Math3in_AA(cTaskContext& ctx) const //(X^2+Y^2+Z^2)
 {
   const tBuffer<int>& input_buffer = ctx.GetInputBuffer();
@@ -1880,6 +1976,132 @@ double cTaskLib::Task_Math3in_AM(cTaskContext& ctx) const //((X+Y)^2+(Y+Z)^2)
       }
     }
   }
+  return 0.0;
+}
+
+double cTaskLib::Task_Fib1(cTaskContext& ctx) const
+{
+  const int test_output = ctx.GetOutputBuffer()[0];
+  const int input_size = ctx.GetInputBuffer().GetNumStored();
+  for (int i = 0; i < input_size ; i++)
+    {
+      if ( test_output == 0)
+	{
+	  return 1.0;
+	}
+    }
+  return 0.0;
+}
+
+double cTaskLib::Task_Fib2(cTaskContext& ctx) const
+{
+  const int test_output = ctx.GetOutputBuffer()[0];
+  const int input_size = ctx.GetInputBuffer().GetNumStored();
+  for (int i = 0; i < input_size ; i++)
+    {
+      if ( test_output == 1)
+	{
+	  return 1.0;
+	}
+    }
+  return 0.0;
+}
+
+double cTaskLib::Task_Fib4(cTaskContext& ctx) const
+{
+  const int test_output = ctx.GetOutputBuffer()[0];
+  const int input_size = ctx.GetInputBuffer().GetNumStored();
+  for (int i = 0; i < input_size ; i++)
+    {
+      if ( test_output == 2)
+	{
+	  return 1.0;
+	}
+    }
+  return 0.0;
+}
+
+double cTaskLib::Task_Fib5(cTaskContext& ctx) const
+{
+  const int test_output = ctx.GetOutputBuffer()[0];
+  const int input_size = ctx.GetInputBuffer().GetNumStored();
+  for (int i = 0; i < input_size ; i++)
+    {
+      if ( test_output == 3)
+	{
+	  return 1.0;
+	}
+    }
+  return 0.0;
+}
+
+double cTaskLib::Task_Fib6(cTaskContext& ctx) const
+{
+  const int test_output = ctx.GetOutputBuffer()[0];
+  const int input_size = ctx.GetInputBuffer().GetNumStored();
+  for (int i = 0; i < input_size ; i++)
+    {
+      if ( test_output == 5)
+	{
+	  return 1.0;
+	}
+    }
+  return 0.0;
+}
+
+double cTaskLib::Task_Fib7(cTaskContext& ctx) const
+{
+  const int test_output = ctx.GetOutputBuffer()[0];
+  const int input_size = ctx.GetInputBuffer().GetNumStored();
+  for (int i = 0; i < input_size ; i++)
+    {
+      if ( test_output == 8)
+	{
+	  return 1.0;
+	}
+    }
+  return 0.0;
+}
+
+double cTaskLib::Task_Fib8(cTaskContext& ctx) const
+{
+  const int test_output = ctx.GetOutputBuffer()[0];
+  const int input_size = ctx.GetInputBuffer().GetNumStored();
+  for (int i = 0; i < input_size ; i++)
+    {
+      if ( test_output == 13)
+	{
+	  return 1.0;
+	}
+    }
+  return 0.0;
+}
+
+double cTaskLib::Task_Fib9(cTaskContext& ctx) const
+{
+  const int test_output = ctx.GetOutputBuffer()[0];
+  const int input_size = ctx.GetInputBuffer().GetNumStored();
+  for (int i = 0; i < input_size ; i++)
+    {
+      if ( test_output == 21)
+	{
+	  return 1.0;
+	}
+    }
+  return 0.0;
+}
+
+double cTaskLib::Task_Fib10(cTaskContext& ctx) const
+{
+  const int test_output = ctx.GetOutputBuffer()[0];
+  const int input_size = ctx.GetInputBuffer().GetNumStored();
+  for (int i = 0; i < input_size ; i++)
+    {
+      if ( test_output == 34)
+	{
+	  return 1.0;
+	}
+    }
   return 0.0;
 }
 
@@ -3591,6 +3813,18 @@ void cTaskLib::Load_ConsumeTargetEqu(const cString& name, const cString& argstr,
   m_world->GetEnvironment().AddTargetID(args->GetInt(0));
 }
 
+void cTaskLib::Load_MoveFT(const cString& name, const cString& argstr, cEnvReqs&, Feedback& feedback)
+{
+  cArgSchema schema;
+  
+  schema.AddEntry("target_id", 0, 1);
+  cArgContainer* args = cArgContainer::Load(argstr, schema, feedback);
+  if (args) NewTask(name, "MoveFT", &cTaskLib::Task_MoveFT, 0, args);
+
+  // Add this target id to the list in the instructions file. 
+  m_world->GetEnvironment().AddTargetID(args->GetInt(0));
+}
+
 double cTaskLib::Task_ConsumeTarget(cTaskContext& ctx) const
 {
   int des_target = ctx.GetTaskEntry()->GetArguments().GetInt(0);
@@ -3727,6 +3961,54 @@ double cTaskLib::Task_ConsumeTargetEqu(cTaskContext& ctx) const
   // If the organism is on the right resource...
   if (target_res == des_target) {
     reward = Task_Equ(ctx);
+  }
+  return reward;
+}
+
+double cTaskLib::Task_MoveFT(cTaskContext& ctx) const
+{
+  double reward = 0.0;
+  bool moved = false;
+  
+  int cell_id = ctx.GetOrganism()->GetCellID();
+  if (m_world->GetConfig().USE_AVATARS.Get()) cell_id = ctx.GetOrganism()->GetAVCellID();
+  if (cell_id != ctx.GetOrganism()->GetPrevSeenCellID()) {
+    moved = true;
+  }
+
+  if (moved) {
+    int des_target = ctx.GetTaskEntry()->GetArguments().GetInt(0);
+    
+    int target_res = ctx.GetOrganism()->GetForageTarget();
+    
+    // If the organism is on the right resource...
+    if (target_res == des_target) {
+      reward = 1;
+      ctx.GetOrganism()->SetPrevSeenCellID(cell_id);
+    }
+  }
+  return reward;
+}
+
+/* Reward organisms for executing the explode command*/
+void cTaskLib::Load_Exploded(const cString& name, const cString& argstr, cEnvReqs&, Feedback& feedback)
+{
+  cArgSchema schema;
+  
+  cArgContainer* args = cArgContainer::Load(argstr, schema, feedback);
+  if (args) NewTask(name, "Exploded", &cTaskLib::Task_Exploded, 0, args);
+  
+  // Add this target id to the list in the instructions file.
+  m_world->GetEnvironment().AddTargetID(args->GetInt(0));
+}
+
+double cTaskLib::Task_Exploded(cTaskContext& ctx) const
+{
+  bool exploded = ctx.GetOrganism()->GetPhenotype().GetKaboomExecuted();
+  double reward = 0.0;
+  // If the organism has executed an explode instruction
+  if (exploded) {
+    reward = 1;
   }
   return reward;
 }

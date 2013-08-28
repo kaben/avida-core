@@ -470,7 +470,14 @@ private:
 
   bool Inst_SpawnDeme(cAvidaContext& ctx);
   bool Inst_Kazi(cAvidaContext& ctx);
+  bool Inst_Kazi1(cAvidaContext& ctx);
+  bool Inst_Kazi2(cAvidaContext& ctx);
+  bool Inst_Kazi3(cAvidaContext& ctx);
+  bool Inst_Kazi4(cAvidaContext& ctx);
   bool Inst_Kazi5(cAvidaContext& ctx);
+  bool Inst_SenseQuorum(cAvidaContext& ctx);
+  bool Inst_NoisyQuorum(cAvidaContext& ctx);
+  bool Inst_SmartExplode(cAvidaContext& ctx);
   bool Inst_Die(cAvidaContext& ctx);
   bool Inst_Poison(cAvidaContext& ctx);
   bool Inst_Suicide(cAvidaContext& ctx);
@@ -518,7 +525,7 @@ private:
   bool Inst_Collect(cAvidaContext& ctx);
   bool Inst_CollectNoEnvRemove(cAvidaContext& ctx);
   bool Inst_Destroy(cAvidaContext& ctx);
-  bool Inst_NopCollect(cAvidaContext& ctx);  
+  bool Inst_NopCollect(cAvidaContext& ctx);
   bool Inst_CollectUnitProbabilistic(cAvidaContext& ctx);
   bool Inst_CollectSpecific(cAvidaContext& ctx);
   bool Inst_IfResources(cAvidaContext& ctx);  //! Execute the following instruction if all resources are above their min level.

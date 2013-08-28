@@ -1,5 +1,5 @@
-# Fri Apr 12 15:23:41 2013
-# Filename........: archive/ft-1_grp-1_073-aaaaf.org
+# Thu Jul 25 18:59:48 2013
+# Filename........: archive/ft-2_grp-1_073-aaaaf.org
 # Update Output...: 100
 # Is Viable.......: 0
 # Repro Cycle Size: 0
@@ -14,8 +14,8 @@
 # Copied Size.....: 73
 # Executed Size...: 73
 # Last Birth Group ID........: -1
-# Last Birth Forager Type....: -1
-# Last Birth Cell............: 0
+# Last Birth Forager Type....: -2
+# Last Birth Cell............: 30062
 # Offspring.......: NONE
 # 
 # Tasks Performed:

@@ -405,6 +405,7 @@ private:
   bool Inst_IfLessConsensus(cAvidaContext& ctx);
   bool Inst_IfLessConsensus24(cAvidaContext& ctx);
   bool Inst_IfStackGreater(cAvidaContext& ctx);
+  bool Inst_IfNest(cAvidaContext& ctx);
   bool Inst_Label(cAvidaContext& ctx);
 
   // Stack and Register Operations
@@ -570,6 +571,7 @@ private:
   bool Inst_GetFacedOrgDensity(cAvidaContext& ctx);
   
   bool DoActualCollect(cAvidaContext& ctx, int bin_used, bool unit);
+  bool FakeActualCollect(cAvidaContext& ctx, int bin_used, bool unit);
   bool Inst_CollectEdible(cAvidaContext& ctx);
   bool Inst_CollectSpecific(cAvidaContext& ctx);
   bool Inst_DepositResource(cAvidaContext& ctx);
@@ -578,7 +580,9 @@ private:
   bool Inst_NopDepositResource(cAvidaContext& ctx);
   bool Inst_NopDepositSpecific(cAvidaContext& ctx);    
   bool Inst_NopDepositAllAsSpecific(cAvidaContext& ctx);
+  bool Inst_Nop2DepositAllAsSpecific(cAvidaContext& ctx);
   bool Inst_NopCollectEdible(cAvidaContext& ctx);
+  bool Inst_Nop2CollectEdible(cAvidaContext& ctx);
   bool Inst_GetResStored(cAvidaContext& ctx);
   bool Inst_GetSpecificStored(cAvidaContext& ctx);
 
@@ -608,12 +612,14 @@ private:
   bool Inst_AttackPreyGroupShare(cAvidaContext& ctx);
   bool Inst_AttackSpecPrey(cAvidaContext& ctx);
   bool Inst_AttackPreyArea(cAvidaContext& ctx);
-  bool Inst_AttackFTPrey(cAvidaContext& ctx); 
+
+  bool Inst_AttackFTPrey(cAvidaContext& ctx);
   bool Inst_AttackPoisonPrey(cAvidaContext& ctx);
   bool Inst_AttackPoisonFTPrey(cAvidaContext& ctx);
   bool Inst_AttackPoisonFTPreyGenetic(cAvidaContext& ctx);
   bool Inst_AttackPoisonFTMixedPrey(cAvidaContext& ctx);
-  bool Inst_FightMeritOrg(cAvidaContext& ctx); 
+
+  bool Inst_FightMeritOrg(cAvidaContext& ctx);
   bool Inst_FightBonusOrg(cAvidaContext& ctx); 
   bool Inst_GetMeritFightOdds(cAvidaContext& ctx); 
   bool Inst_FightOrg(cAvidaContext& ctx); 
@@ -680,7 +686,7 @@ private:
   
   bool GoLook(cAvidaContext& ctx, const int look_dir, const int cell_id, bool use_ft = false);
   cOrgSensor::sLookOut InitLooking(cAvidaContext& ctx, sLookRegAssign& lookin_defs, int facing, int cell_id, bool use_ft = false);
-  void LookResults(sLookRegAssign& lookin_defs, cOrgSensor::sLookOut& look_results);
+  void LookResults(cAvidaContext& ctx, sLookRegAssign& lookin_defs, cOrgSensor::sLookOut& look_results);
   
   void InjureOrg(cOrganism* target);
   void MakePred(cAvidaContext& ctx);
@@ -696,7 +702,7 @@ private:
   bool ExecutePoisonPreyAttack(cAvidaContext& ctx, cOrganism* target, sAttackReg& reg, double odds = -1);
   
   bool TestAttackResultsOut(sAttackResult& results);
-  bool TestAttackChance(cOrganism* target, sAttackReg& reg, double odds = -1);
+  bool TestAttackChance(cAvidaContext& ctx, cOrganism* target, sAttackReg& reg, double odds = -1);
   void ApplyKilledPreyMerit(cOrganism* target, double effic);
   void ApplyKilledPreyReactions(cOrganism* target);
   void ApplyKilledPreyBonus(cOrganism* target, sAttackReg& reg, double effic);
