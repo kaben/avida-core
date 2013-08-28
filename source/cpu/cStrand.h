@@ -323,6 +323,7 @@ public:
   Apto::Map<int, Apto::Set<int> > m_bindpts;
 public:
   virtual ~cBindable(){}
+  Apto::Array<int> GetBindings(cFSMDB &db);
   virtual Apto::Map<int, Apto::Array<int> > &GetLabels(cFSMDB &db) = 0;
   virtual Apto::String AsString(cFSMDB &db) = 0;
 };
@@ -545,27 +546,25 @@ public:
 class cFSMDB {
 public:
   Apto::SmartPtr<Apto::RNG::AvidaRNG> m_rng;
+  cBasicLabelUtils m_label_utils;
 
   cLabelIdx m_lbls;
   cSeqIdx m_seqs;
   ObjIdx<cFSMDef> m_fsm_defs;
-
-  ObjIdx<cHalfBinding> m_half_bindings;
   ObjIdx<cBindable> m_bindables;
+  ObjIdx<cHalfBinding> m_half_bindings;
   //cKinetics m_kinetics;
   Apto::Scheduler::ProbabilisticDynamic m_collision_scheduler;
   Apto::Scheduler::IntegratedDynamic m_unbinding_scheduler;
 
-  cBasicLabelUtils m_label_utils;
-
   Apto::Array<FSMFunctor> m_functors;
-
   cFSMFunctorObject m_functor_object;
 
   int CreateStrand();
   int CreateStrand(const Apto::String &sequence);
-  bool AssociateSeqToStrand(int strand_id, const Apto::String &seq);
-  bool RemoveStrand(int strand_id);
+  void AssociateSeqToStrand(int strand_id, const Apto::String &seq);
+  void RemoveStrand(int strand_id);
+  void LyseStrand(int strand_id, int at_position);
 
   int CreateFSMBootstrap();
 

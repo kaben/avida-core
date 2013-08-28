@@ -71,8 +71,7 @@ int Apto::Scheduler::ProbabilisticDynamic::DynamicWeightedIndex::findPosition(do
   if (position < m_item_weight[root_id]) { return root_id; }
   // If not, then see if we should search in the left subtree...
   position -= m_item_weight[root_id];
-  const int left_id = leftChildOf(root_id);
-  assert (left_id < m_size);
+  const int left_id = leftChildOf(root_id); assert (left_id < m_size);
   if (position < m_subtree_weight[left_id]) { return findPosition(position, left_id); }
   // Otherwise we must look in the right subtree...
   position -= m_subtree_weight[left_id];
@@ -425,6 +424,19 @@ int cBasicLabelUtils::ReverseComplement(const int id, const int rot) const {
   return new_id;
 }
 
+Apto::Array<int> cBindable::GetBindings(cFSMDB &db) {
+  Apto::Set<int> half_binding_set;
+  for (Apto::Map<int, Apto::Set<int> >::KeyIterator kit = m_bindpts.Keys(); kit.Next();) {
+    for (Apto::Set<int>::Iterator it = m_bindpts[*kit.Get()].Begin(); it.Next();) {
+       half_binding_set.Insert(*it.Get());
+    }
+  }
+  Apto::Array<int> half_binding_ary;
+  for (Apto::Set<int>::Iterator it = half_binding_set.Begin(); it.Next();) {
+    half_binding_ary.Push(*it.Get());
+  }
+  return half_binding_ary;
+}
 
 Apto::Map<int, Apto::Array<int> > &cStrand::GetLabels(cFSMDB &db) {
   return db.m_seqs.Get(m_seq_id)->m_labels;
@@ -653,18 +665,14 @@ int cFSMDB::CreateStrand(const Apto::String &seq) {
   AssociateSeqToStrand(strand_id, seq);
   return strand_id;
 }
-bool cFSMDB::AssociateSeqToStrand(int strand_id, const Apto::String &seq) {
-  cStrand* strand_ptr = m_bindables.Get<cStrand>(strand_id);
-  //if (NULL == strand_ptr) { return false; }
-  assert(NULL != strand_ptr);
+void cFSMDB::AssociateSeqToStrand(int strand_id, const Apto::String &seq) {
+  cStrand* strand_ptr = m_bindables.Get<cStrand>(strand_id); assert(NULL != strand_ptr);
   int old_seq_id = strand_ptr->m_seq_id;
 
   /* Disassociate old sequence, if any. */
   cSequence* old_seq_ptr(NULL);
   if (0 <= old_seq_id) {
-    old_seq_ptr = m_seqs.Get(old_seq_id);
-    //if (NULL == old_seq_ptr) { return false; }
-    assert(NULL != old_seq_ptr);
+    old_seq_ptr = m_seqs.Get(old_seq_id); assert(NULL != old_seq_ptr);
     /* Unlink strand and old sequence. */
     old_seq_ptr->m_strand_ids.Remove(strand_id);
     strand_ptr->m_seq_id = -1;
@@ -673,9 +681,7 @@ bool cFSMDB::AssociateSeqToStrand(int strand_id, const Apto::String &seq) {
   /* Associate new sequence, if any. */
   if (0 < seq.GetSize()) {
     int new_seq_id = InsertSequence(seq);
-    cSequence* new_seq_ptr = m_seqs.Get(new_seq_id);
-    //if (NULL == new_seq_ptr) { return false; }
-    assert(NULL != new_seq_ptr);
+    cSequence* new_seq_ptr = m_seqs.Get(new_seq_id); assert(NULL != new_seq_ptr);
     /* Link strand and new sequence. */
     strand_ptr->m_seq_id = new_seq_id;
     new_seq_ptr->m_strand_ids.Insert(strand_id);
@@ -686,16 +692,75 @@ bool cFSMDB::AssociateSeqToStrand(int strand_id, const Apto::String &seq) {
     if (old_seq_ptr->m_strand_ids.GetSize() < 1) { RemoveSequence(old_seq_id); }
   }
   m_collision_scheduler.AdjustPriority(strand_id, seq.GetSize());
-
-  return true;
 }
-bool cFSMDB::RemoveStrand(int strand_id) {
-  bool okay = true;
-  if (!AssociateSeqToStrand(strand_id, "")) { okay = false; }
-  if (!m_bindables.Delete(strand_id)) { okay = false; }
-  //return okay;
-  assert(okay);
-  return true;
+void cFSMDB::RemoveStrand(int strand_id) {
+  AssociateSeqToStrand(strand_id, "");
+  m_bindables.Delete(strand_id);
+}
+void cFSMDB::LyseStrand(int strand_id, int at_pos) {
+  cStrand* par_ptr = m_bindables.Get<cStrand>(strand_id); assert(NULL != par_ptr);
+  Apto::String par_str(par_ptr->AsString(*this));
+  int par_len = par_str.GetSize(); assert(at_pos <= par_len);
+  Apto::String daught_0_str(par_str.Substring(0, at_pos));
+  Apto::String daught_1_str(par_str.Substring(at_pos));
+  int daught_0_id = CreateStrand(par_str.Substring(0, at_pos));
+  int daught_1_id = CreateStrand(par_str.Substring(at_pos));
+  cStrand *daught_0 = m_bindables.Get<cStrand>(daught_0_id);
+  cStrand *daught_1 = m_bindables.Get<cStrand>(daught_1_id);
+  cout << "par_str: " << par_str << ", at_pos: " << at_pos << endl;
+  cout << "daught_0: " << daught_0_str << endl;
+  cout << "daught_1: " << daught_1_str << endl;
+
+  Apto::Map<int, Apto::Set<int> > daught_0_lbls, daught_1_lbls;
+  Apto::Map<int, Apto::Array<int> > &daught_0_lbl_arys(daught_0->GetLabels(*this));
+  Apto::Map<int, Apto::Array<int> > &daught_1_lbl_arys(daught_1->GetLabels(*this));
+  for (Apto::Map<int, Apto::Array<int> >::KeyIterator kit = daught_0_lbl_arys.Keys(); kit.Next();){
+    int lbl_id = *kit.Get();
+    int pos_ct = daught_0_lbl_arys[lbl_id].GetSize();
+    for (int i=0; i<pos_ct; i++) { daught_0_lbls[lbl_id].Insert(daught_0_lbl_arys[lbl_id][i]); }
+  }
+  for (Apto::Map<int, Apto::Array<int> >::KeyIterator kit = daught_1_lbl_arys.Keys(); kit.Next();){
+    int lbl_id = *kit.Get();
+    int pos_ct = daught_1_lbl_arys[lbl_id].GetSize();
+    for (int i=0; i<pos_ct; i++) { daught_1_lbls[lbl_id].Insert(daught_1_lbl_arys[lbl_id][i]); }
+  }
+
+  for (Apto::Map<int, Apto::Set<int> >::KeyIterator pos_it = par_ptr->m_bindpts.Keys(); pos_it.Next();) {
+    int pos = *pos_it.Get();
+    for (Apto::Set<int>::Iterator id_it = par_ptr->m_bindpts[pos].Begin(); id_it.Next();) {
+      int lbl_hb_id = *id_it.Get();
+      cHalfBinding *lbl_hb = m_half_bindings.Get(lbl_hb_id);
+      int lbl_id = lbl_hb->m_lbl_id;
+      int lbl_len = lbl_hb->m_lbl_len;
+      cout << "pos: " << pos << ", lbl_hb_id: " << lbl_hb_id << ", lbl: " << m_label_utils.ID2Seq(lbl_id) << endl;
+      if (pos < at_pos) {
+        /* Transfer to daughter 0. */
+        if (daught_0_lbls.Has(lbl_id) && daught_0_lbls[lbl_id].Has(pos)) {
+          cout << "transferring to daughter 0" << endl;
+          lbl_hb->m_parent_id = daught_0_id;
+          for (int i=0; i < lbl_len; i++) { daught_0->m_bindpts[pos].Insert(lbl_hb_id); }
+        }
+      } else {
+        /* Transfer to daughter 1. */
+        int lbl_pos = lbl_hb->m_lbl_pos - at_pos;
+        if (daught_1_lbls.Has(lbl_id) && daught_1_lbls[lbl_id].Has(lbl_pos)) {
+          cout << "transferring to daughter 1" << endl;
+          lbl_hb->m_parent_id = daught_1_id;
+          lbl_hb->m_lbl_pos = lbl_pos;
+          for (int i=0; i < lbl_len; i++) { daught_1->m_bindpts[lbl_pos].Insert(lbl_hb_id); }
+        }
+      }
+    }
+  }
+    //for (Apto::Map<int, Apto::Set<int> >::KeyIterator it = lbl_sites.Keys(); it.Next();) {
+    //  int lbl_id = *it.Get();
+    //  seq_ptr->m_labels[lbl_id].Resize(lbl_sites[lbl_id].GetSize());
+    //  int j=0;
+    //  for (Apto::Set<int>::Iterator pos_it = lbl_sites[lbl_id].Begin(); pos_it.Next();) {
+    //    seq_ptr->m_labels[lbl_id][j] = *pos_it.Get();
+    //    j++;
+    //  }
+    //}
 }
 int cFSMDB::CreateFSMBootstrap() {
   cFSMBootstrap* ptr = m_bindables.Create<cFSMBootstrap>();

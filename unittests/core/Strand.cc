@@ -35,6 +35,168 @@ using namespace std;
 
 
 /*
+BOOKMARK 20130827-2020
+- Strands can be made circular by adding a boolean instance variable
+  "m_is_circular". Circular strands can be labelled similarly to noncircular
+  ones, and in addition, allowing the scan for labels to wrap around the end of
+  the strand by N-1 additional characters, where N is the max label length.
+
+  The strand-lysing/joining operations would need to be modified accordingly.
+
+BOOKMARK 20130827-1913
+- TODO: the sections below may need to be rewritten, replacing "strand" with
+  "molecule". On the other hand, we only expect these operations to be
+  performed on strands, not state machines, so perhaps not.
+
+- TODO: potential optimization: the lysing and/or joining operations below can
+  be extended to sequences, and then labels would be copied to daughter
+  sequences; in the case of joining, new labels across the joining boundary
+  would need to be identified. But the system will function without this
+  optimzation.
+
+- What to do about bindings on a strand, as the strand is modified? It depends
+  on the modification.
+
+  - Lysing: When a parent strand is lysed into two daughter strands, no symbols
+    are inserted, deleted or changed; their ordering is preserved; in the first
+    daughter strand, each of its symbols will retain the same position they
+    symbol had in the parent strand; in the second daughter strand, each of its
+    symbols will have a position offset from its former position, by
+    subtracting the length of the first daughter strand from the symbol's
+    former position:
+
+    "abcdefghijklmnopqrstuvwxyz"
+     00000000001111111111222222
+     01234567890123456789012345
+    ==>
+    "abcdefghij"
+     0000000000
+     0123456789 <-- original positions.
+    +
+    "klmnopqrstuvwxyz"
+     0000000000111111
+     0123456789012345 <-- new positions, offset by subtracting 10 from old
+                          positions, where 10 is length of first daughter.
+  
+    No labels that cross the lysing boundary will survive the lysing. Any
+    labels in the first daughter will also exist in the parent, and at the same
+    positions. And any labels in the second daughter will, again, also exist in
+    the parent, but at positions offset by subtracting the length of the first
+    daughter.
+
+    To copy surving bindings from the parent to the first daughter, check for
+    halfbindings at each position in the parent up to the length of the first
+    daughter; for each halfbinding, examine its label ID and position;
+    determine whether the label is present at the same position in the first
+    daughter; if so, the binding survives, and is transferred to the first
+    daughter, and in the process, its parent ID is switched to the ID of the
+    daughter.
+
+    To copy surving bindings from the parent to the second daughter, check for
+    halfbindings at each position in the parent starting from the length of the
+    second daughter, and continuing to the length of the parent; for each
+    halfbinding, examine its label ID and position; determine whether the label
+    is present in the second daughter, at a position offset from the original
+    by subtracing the length of the first daughter; if so, the binding
+    survives, and is transferred to the second daughter, and in the process,
+    its parent ID is switched to the ID of the second daughter, and its
+    position offset by subtracting the length of the first daughter.
+
+    Any binding that crosses the lysing boundary is simply unbound.
+
+  - Joining: Joining is the inverse of lysing, so when two parent strands are
+    joined into a daughter strand, again no symbols are inserted, deleted, or
+    changed; and again, their ordering is preserved; if N is the length of the
+    first parent, then the first N symbols in the daughter strand will retain
+    the same position they had in the first parent; and each of the remaining
+    symbols in the daughter strand will have a position offset from its former
+    position, by adding the length of the first parent to the symbols former
+    position:
+
+    "abcdefghij"
+     0000000000
+     0123456789
+    +
+    "klmnopqrstuvwxyz"
+     0000000000111111
+     0123456789012345
+    ==>
+    "abcdefghijklmnopqrstuvwxyz"
+     00000000001111111111222222
+     01234567890123456789012345
+     |--------| <-- original positions.
+               |--------------| <-- new positions, offset by adding 10 from the
+                                    old positions, where 10 is the length of
+                                    the first parent.
+
+    If the first parent strand ends with label characters, and the second
+    parent strand begins with label characters, then the daughter strand will
+    have new labels across the joining boundary, labels that did not exist in
+    either parent strand.
+
+    All bindings in the first parent can be transferred directly to the
+    daughter.
+
+    All bindings in the second parent can also be tranferred to the daughter,
+    but their positions must first by offset by adding the length of the first
+    parent.
+
+    Although new labels may have appeared across the joining boundary, no new
+    bindings need be created here, although they many now appear naturally as
+    molecules stochastically unbind, collide, and rebind.
+
+  - Deleting: This is like lysing a parent strand into two daughters, and then
+    lysing one of the daughters into two more daughters, for a total of three
+    daughters; then discarding one of the daughters; and then joining the
+    remaining two in their original positions.
+
+  - Inserting: This is like lysing a parent strand into two daughters; adding
+    another daughter either before, between, or after the other two; and then
+    joining all three daughters.
+
+  - Changing: This is like lysing a parent strand into two daughters, and then
+    lysing one of the daughters into two more daughters, for a total of three
+    daughters; then replacing one of the daughters; and then joining all three
+    daughters.
+
+  
+
+BOOKMARK 20130827-1734
+- I've implemented strand alteration as in the following example:
+
+    int strand_id_0 = db.CreateStrand();
+    db.AssociateSeqToStrand(strand_id_0, "aaabaacaadabbabcabdacbaccacdadbadcaddbbbcbbdbccbcdbdcbddcccdcdddaa");
+    db.AssociateSeqToStrand(strand_id_0, "");
+
+  Next step is to bind strand to a state machine, and make the state machine
+  operate on the strand. Next step after that is to make it generate a new
+  strand. Next step after that is to make it generate a strand's complement
+  while binding the complement to the strand. Next step after that is to encode
+  a state machine.
+
+  Specific steps:
+  - Instantiate NFA def. Give it a long label.
+  - Instantiate strand containing complement.
+  - Instantiate NFA using def.
+  - Collide NFA and strand.
+  - How do I read from a bound strand? What about when multiple strands are
+    bound to NFA? Which one is the read strand? Do I have to be bound to a
+    write strand? Do I have to be bound to a complement strand?
+    - Here I mean that the NFA is bound to a strand, and is generating its
+      complement while binding the complement to the strand.
+  - Be able to read from a strand.
+  - Be able to write to a strand.
+  - Be able to generate strand complement.
+  - Make a bootstrap FSM that binds to a genome strand at an "acacxx" label,
+    and then decodes some portion of the genome strand into an NFA.
+    - How do I find the "start" and "end" points for decoding?
+    - Make some decoders.
+    - Decode, building the NFA one step at a time while decoding.
+    - Detach the NFA, registering it as a bindable.
+  - Make a scheduler for state machines.
+  - Select a state machine using the scheduler.
+  - Make the state machine execute a single step.
+
 BOOKMARK 20130827-1256
 - Some operations an FSM can perform:
   - lysing.
@@ -1141,7 +1303,7 @@ namespace nFSMDBTests {
     EXPECT_EQ(0, db.m_lbls.GetSize());
   }
 
-  TEST(cFSMdb, AssociateSeqToStrand){
+  TEST(cFSMDB, AssociateSeqToStrand){
     cFSMDBTestFixture db;
     /*
     This is a debruijn sequence containing:
@@ -1154,15 +1316,13 @@ namespace nFSMDBTests {
     */
     EXPECT_EQ(0, db.m_bindables.GetSize());
     int strand_id_0 = db.CreateStrand();
-    Apto::String seq_0("aaabaacaadabbabcabdacbaccacdadbadcaddbbbcbbdbccbcdbdcbddcccdcdddaa");
     /* Database should be mostly empty since strand and sequence aren't associated, and seq isn't in database. */
     EXPECT_EQ(1, db.m_bindables.GetSize());
     EXPECT_EQ(0, db.m_lbls.GetSize());
     EXPECT_EQ(0, db.m_seqs.GetSize());
     EXPECT_EQ("", db.m_bindables.Get<cStrand>(strand_id_0)->AsString(db));
 
-    db.AssociateSeqToStrand(strand_id_0, seq_0);
-
+    db.AssociateSeqToStrand(strand_id_0, "aaabaacaadabbabcabdacbaccacdadbadcaddbbbcbbdbccbcdbdcbddcccdcdddaa");
     /* Database should now have more stuff since strand and sequence have been associated. */
     EXPECT_EQ(1, db.m_bindables.GetSize());
     /*
@@ -1184,8 +1344,80 @@ namespace nFSMDBTests {
     db.RemoveStrand(strand_id_0);
     EXPECT_EQ(0, db.m_bindables.GetSize());
   }
+
+  TEST(cFSMDB, LyseStrand){
+    cFSMDBTestFixture db;
+    db.m_label_utils.m_max_label_size = 6;
+    int strand_id_0 = db.CreateStrand();
+    int strand_id_1 = db.CreateStrand();
+    db.AssociateSeqToStrand(strand_id_0, "aaaaaagbbbbbbnopqrstuvwxcccccc");
+    db.AssociateSeqToStrand(strand_id_1, "aaaaaagddddddnopqrstuvwxcccccc");
+    db.Collide(strand_id_0, strand_id_1);
+    db.LyseStrand(strand_id_0, 10);
+    db.RemoveStrand(strand_id_0);
+  }
 }
 
+
+namespace nContainerConversion {
+
+  template <class T> Apto::Set<T> AsSet(Apto::Array<T> &ary) {
+    Apto::Set<T> set;
+    for (int i=0; i < ary.GetSize(); i++) { set.Insert(ary[i]); }
+    return set;
+  }
+  TEST(ContainerConversion, Array_AsSet){
+    Apto::Array<int> ary;
+
+    for (int i=0; i<100; i++) { ary.Push(i); }
+    for (int i=0; i<100; i++) { EXPECT_EQ(i, ary[i]); }
+
+    Apto::Set<int> set = AsSet(ary);
+    EXPECT_EQ(100, set.GetSize());
+
+    for (Apto::Set<int>::Iterator it = set.Begin(); it.Next();) { ary[*it.Get()] = 0; }
+    for (int i=0; i<100; i++) { EXPECT_EQ(0, ary[i]); }
+  }
+
+  template <class T> Apto::Array<T> AsArray(Apto::Set<T> &set) {
+    Apto::Array<T> ary;
+    for (typename Apto::Set<T>::Iterator it = set.Begin(); it.Next();) { ary.Push(*it.Get()); }
+    return ary;
+  }
+  TEST(ContainerConversion, DISABLED_Set_AsArray){
+    Apto::Set<int> set;
+    for (int i=0; i<100; i++) { set.Insert(i); }
+    for (int i=0; i<100; i++) { EXPECT_TRUE(set.Has(i)); }
+
+    Apto::Array<int> ary = AsArray(set);
+    EXPECT_EQ(100, ary.GetSize());
+
+    for (int i=0; i<100; i++) { cout << "ary[" << i << "]: " << ary[i] << endl; }
+    for (int i=0; i<100; i++) {
+      //EXPECT_TRUE(set.Has(ary[i]));
+      //if (set.Has(ary[i])) {
+      //  set.Remove(ary[i]);
+      //}
+      int x = ary[i];
+      EXPECT_TRUE(set.Has(x));
+      if (set.Has(x)) {
+        set.Remove(x);
+      }
+    }
+    EXPECT_EQ(0, set.GetSize());
+  }
+
+  TEST(Set, DISABLED_regression_1) {
+    Apto::Set<int> set;
+    for (int i=0; i<100; i++) { set.Insert(i); }
+    for (int i=0; i<100; i++) { set.Remove(i); }
+  }
+  TEST(Map, DISABLED_regression_1) {
+    Apto::Map<int, int> map;
+    for (int i=0; i<100; i++) { map.Set(i, i); }
+    for (int i=0; i<100; i++) { map.Remove(i); }
+  }
+}
 
 namespace nBasicLabelUtilsTests {
   TEST(cBasicLabelUtils, Rotate) {
