@@ -736,7 +736,7 @@ void cFSMDB::RemoveStrand(int strand_id) {
   /* Delete strand. */
   m_bindables.Delete(strand_id);
 }
-void cFSMDB::LyseStrand(int strand_id, int at_pos, int &ret_d0_id, int &ret_d1_id) {
+void cFSMDB::SplitStrand(int strand_id, int at_pos, int &ret_d0_id, int &ret_d1_id) {
   cStrand* par = m_bindables.Get<cStrand>(strand_id); assert(NULL != par);
   Apto::String par_str(par->AsString(*this));
   int par_len = par_str.GetSize(); assert(at_pos <= par_len);
@@ -823,6 +823,8 @@ void cFSMDB::LyseStrand(int strand_id, int at_pos, int &ret_d0_id, int &ret_d1_i
     }
   }
   RemoveStrand(strand_id);
+}
+void cFSMDB::JoinStrands(int strand_0_id, int strand_1_id, int &ret_daughter_id) {
 }
 int cFSMDB::CreateFSMBootstrap() {
   cFSMBootstrap* ptr = m_bindables.Create<cFSMBootstrap>();

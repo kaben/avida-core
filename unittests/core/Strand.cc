@@ -35,21 +35,47 @@ using namespace std;
 
 
 /*
+BOOKMARK 20130828-2128
+- Currently working on cFSMDB::JoinStrands(). See info in BOOKMARK
+  20130827-1913 regarding the joining operation.
+
+BOOKMARK 20130828-2115
+- Things to think about for formal commits and writing:
+  - Do I want to name classes and functions after biological concepts I'm
+    hoping to analogize?
+  - Thoroughly test everything, updating tests as I go.
+  - No "cout"-based testing. Everything must be testable via asserts or
+    expects.
+  - Minimize optimization, but try to make things optimizable in the future.
+- Potential optimizations:
+  - The ObjIdx instances can have a Free() command to mark things as
+    potentially-deletable upon a GC() command. This would allow information to
+    be retained about transient things that frequently appear and disappear,
+    such as intermediate sequences during strand replication. Then the
+    information wouldn't have to be recomputed so frequently. For example, this
+    would permit retaining labels of a transient seqeuence.
+  - When a sequence is split, e.g. during the process of splitting a strand,
+    labels that don't cross the splitting boundary could be copied from the
+    parent sequence to the daughter sequences. This process would be similar to
+    the one used for splitting sequences.
+  - Similarly, sequence-joining could be optimized.
+
 BOOKMARK 20130827-2020
 - Strands can be made circular by adding a boolean instance variable
   "m_is_circular". Circular strands can be labelled similarly to noncircular
   ones, and in addition, allowing the scan for labels to wrap around the end of
   the strand by N-1 additional characters, where N is the max label length.
 
-  The strand-lysing/joining operations would need to be modified accordingly.
+  The strand-splitting/joining operations would need to be modified
+  accordingly.
 
 BOOKMARK 20130827-1913
 - TODO: the sections below may need to be rewritten, replacing "strand" with
   "molecule". On the other hand, we only expect these operations to be
   performed on strands, not state machines, so perhaps not.
 
-- TODO: potential optimization: the lysing and/or joining operations below can
-  be extended to sequences, and then labels would be copied to daughter
+- TODO: potential optimization: the splitting and/or joining operations below
+  can be extended to sequences, and then labels would be copied to daughter
   sequences; in the case of joining, new labels across the joining boundary
   would need to be identified. But the system will function without this
   optimzation.
@@ -57,13 +83,13 @@ BOOKMARK 20130827-1913
 - What to do about bindings on a strand, as the strand is modified? It depends
   on the modification.
 
-  - Lysing: When a parent strand is lysed into two daughter strands, no symbols
-    are inserted, deleted or changed; their ordering is preserved; in the first
-    daughter strand, each of its symbols will retain the same position they
-    symbol had in the parent strand; in the second daughter strand, each of its
-    symbols will have a position offset from its former position, by
-    subtracting the length of the first daughter strand from the symbol's
-    former position:
+  - Splitting: When a parent strand is split into two daughter strands, no
+    symbols are inserted, deleted or changed; their ordering is preserved; in
+    the first daughter strand, each of its symbols will retain the same
+    position they symbol had in the parent strand; in the second daughter
+    strand, each of its symbols will have a position offset from its former
+    position, by subtracting the length of the first daughter strand from the
+    symbol's former position:
 
     "abcdefghijklmnopqrstuvwxyz"
      00000000001111111111222222
@@ -78,7 +104,7 @@ BOOKMARK 20130827-1913
      0123456789012345 <-- new positions, offset by subtracting 10 from old
                           positions, where 10 is length of first daughter.
   
-    No labels that cross the lysing boundary will survive the lysing. Any
+    No labels that cross the splitting boundary will survive the splitting. Any
     labels in the first daughter will also exist in the parent, and at the same
     positions. And any labels in the second daughter will, again, also exist in
     the parent, but at positions offset by subtracting the length of the first
@@ -102,16 +128,16 @@ BOOKMARK 20130827-1913
     its parent ID is switched to the ID of the second daughter, and its
     position offset by subtracting the length of the first daughter.
 
-    Any binding that crosses the lysing boundary is simply unbound.
+    Any binding that crosses the splitting boundary is simply unbound.
 
-  - Joining: Joining is the inverse of lysing, so when two parent strands are
-    joined into a daughter strand, again no symbols are inserted, deleted, or
-    changed; and again, their ordering is preserved; if N is the length of the
-    first parent, then the first N symbols in the daughter strand will retain
-    the same position they had in the first parent; and each of the remaining
-    symbols in the daughter strand will have a position offset from its former
-    position, by adding the length of the first parent to the symbols former
-    position:
+  - Joining: Joining is the inverse of splitting, so when two parent strands
+    are joined into a daughter strand, again no symbols are inserted, deleted,
+    or changed; and again, their ordering is preserved; if N is the length of
+    the first parent, then the first N symbols in the daughter strand will
+    retain the same position they had in the first parent; and each of the
+    remaining symbols in the daughter strand will have a position offset from
+    its former position, by adding the length of the first parent to the
+    symbols former position:
 
     "abcdefghij"
      0000000000
@@ -145,19 +171,19 @@ BOOKMARK 20130827-1913
     bindings need be created here, although they many now appear naturally as
     molecules stochastically unbind, collide, and rebind.
 
-  - Deleting: This is like lysing a parent strand into two daughters, and then
-    lysing one of the daughters into two more daughters, for a total of three
-    daughters; then discarding one of the daughters; and then joining the
+  - Deleting: This is like splitting a parent strand into two daughters, and
+    then splitting one of the daughters into two more daughters, for a total of
+    three daughters; then discarding one of the daughters; and then joining the
     remaining two in their original positions.
 
-  - Inserting: This is like lysing a parent strand into two daughters; adding
-    another daughter either before, between, or after the other two; and then
-    joining all three daughters.
+  - Inserting: This is like splitting a parent strand into two daughters;
+    adding another daughter either before, between, or after the other two; and
+    then joining all three daughters.
 
-  - Changing: This is like lysing a parent strand into two daughters, and then
-    lysing one of the daughters into two more daughters, for a total of three
-    daughters; then replacing one of the daughters; and then joining all three
-    daughters.
+  - Changing: This is like splitting a parent strand into two daughters, and
+    then splitting one of the daughters into two more daughters, for a total of
+    three daughters; then replacing one of the daughters; and then joining all
+    three daughters.
 
   
 
@@ -199,7 +225,7 @@ BOOKMARK 20130827-1734
 
 BOOKMARK 20130827-1256
 - Some operations an FSM can perform:
-  - lysing.
+  - splitting.
     - after head.
     - before head.
     - before and after head.
@@ -1348,7 +1374,7 @@ namespace nFSMDBTests {
     EXPECT_EQ(0, db.m_bindables.GetSize());
   }
 
-  TEST(cFSMDB, LyseStrand){
+  TEST(cFSMDB, SplitStrand){
     int rng_seed = 0;
     cFSMDBTestFixture db(rng_seed);
     db.m_label_utils.m_max_label_size = 6;
@@ -1366,13 +1392,13 @@ namespace nFSMDBTests {
     EXPECT_EQ(6, db.m_half_bindings.GetSize());
 
     int daughter_id_0 = -1, daughter_id_1 = -1;
-    db.LyseStrand(strand_id_0, 10, daughter_id_0, daughter_id_1);
+    db.SplitStrand(strand_id_0, 10, daughter_id_0, daughter_id_1);
     /*
-    Strand 0 has been lysed into two daughter strands. One of the three
-    bindings was located across the lysing boundary, so should not have
-    survived the lysing. The other two bindings should have survived; now each
-    daughter should have its own binding to strand 1. There should now be three
-    strands, three sequences, and four half bindings.
+    Strand 0 has been split into two daughter strands. One of the three
+    bindings was located across the splitting boundary, so should not have
+    survived the splitting. The other two bindings should have survived; now
+    each daughter should have its own binding to strand 1. There should now be
+    three strands, three sequences, and four half bindings.
     */
     EXPECT_EQ(3, db.m_bindables.GetSize());
     EXPECT_EQ(3, db.m_seqs.GetSize());
