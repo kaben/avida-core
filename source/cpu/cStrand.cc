@@ -728,7 +728,25 @@ void cFSMDB::RemoveStrand(int strand_id) {
 void cFSMDB::SplitStrand(int strand_id, int at_pos, int &ret_d0_id, int &ret_d1_id) {
   cStrand* par = m_bindables.Get<cStrand>(strand_id); assert(NULL != par);
   Apto::String par_str(par->AsString(*this));
-  int par_len = par_str.GetSize(); assert(at_pos <= par_len);
+  int par_len = par_str.GetSize(); 
+  if (at_pos <= 0) {
+    /*
+    If split position is before start of parent strand, the first daughter will
+    be an (invalid) empty strand, and the second daughter will be identical to
+    the parent strand.
+    */
+    ret_d1_id = strand_id;
+    return;
+  }
+  if (par_len <= at_pos) {
+    /*
+    If split position is after end of parent strand, the first daughter will be
+    identical to the parent strand, and the second daughter will be an
+    (invalid) empty strand.
+    */
+    ret_d0_id = strand_id;
+    return;
+  }
   ret_d0_id = CreateStrand(par_str.Substring(0, at_pos));
   ret_d1_id = CreateStrand(par_str.Substring(at_pos));
   cStrand *d0 = m_bindables.Get<cStrand>(ret_d0_id);

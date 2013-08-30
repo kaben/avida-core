@@ -1393,6 +1393,8 @@ namespace nFSMDBTests {
 
     int daughter_id_0 = -1, daughter_id_1 = -1;
     db.SplitStrand(strand_id_0, 10, daughter_id_0, daughter_id_1);
+    cStrand *d0(db.m_bindables.Get<cStrand>(daughter_id_0));
+    cStrand *d1(db.m_bindables.Get<cStrand>(daughter_id_1));
     /*
     Strand 0 has been split into two daughter strands. One of the three
     bindings was located across the splitting boundary, so should not have
@@ -1400,6 +1402,10 @@ namespace nFSMDBTests {
     each daughter should have its own binding to strand 1. There should now be
     three strands, three sequences, and four half bindings.
     */
+    EXPECT_EQ("aaaaaagbbb", d0->AsString(db));
+    EXPECT_TRUE(d0->m_bindpts.Has(0));
+    EXPECT_EQ("bbbnopqrstuvwxcccccc", d1->AsString(db));
+    EXPECT_TRUE(d1->m_bindpts.Has(14));
     EXPECT_EQ(3, db.m_bindables.GetSize());
     EXPECT_EQ(3, db.m_seqs.GetSize());
     EXPECT_EQ(4, db.m_half_bindings.GetSize());
@@ -1432,6 +1438,38 @@ namespace nFSMDBTests {
     EXPECT_EQ(0, db.m_bindables.GetSize());
     EXPECT_EQ(0, db.m_seqs.GetSize());
     EXPECT_EQ(0, db.m_half_bindings.GetSize());
+  }
+
+  TEST(cFSMDB, SplitStrand_before_start){
+    int rng_seed = 0;
+    cFSMDBTestFixture db(rng_seed);
+    db.m_label_utils.m_max_label_size = 6;
+    int strand_id_0 = db.CreateStrand();
+    db.AssociateSeqToStrand(strand_id_0, "aaaaaagbbb");
+    int daughter_id_0 = -1, daughter_id_1 = -1;
+    db.SplitStrand(strand_id_0, 0, daughter_id_0, daughter_id_1);
+    EXPECT_EQ(strand_id_0, daughter_id_1);
+    EXPECT_EQ(-1, daughter_id_0);
+    db.SplitStrand(strand_id_0, -1, daughter_id_0, daughter_id_1);
+    EXPECT_EQ(strand_id_0, daughter_id_1);
+    EXPECT_EQ(-1, daughter_id_0);
+    db.RemoveStrand(strand_id_0);
+  }
+
+  TEST(cFSMDB, SplitStrand_after_end){
+    int rng_seed = 0;
+    cFSMDBTestFixture db(rng_seed);
+    db.m_label_utils.m_max_label_size = 6;
+    int strand_id_0 = db.CreateStrand();
+    db.AssociateSeqToStrand(strand_id_0, "aaaaaagbbb");
+    int daughter_id_0 = -1, daughter_id_1 = -1;
+    db.SplitStrand(strand_id_0, 10, daughter_id_0, daughter_id_1);
+    EXPECT_EQ(strand_id_0, daughter_id_0);
+    EXPECT_EQ(-1, daughter_id_1);
+    db.SplitStrand(strand_id_0, 11, daughter_id_0, daughter_id_1);
+    EXPECT_EQ(strand_id_0, daughter_id_0);
+    EXPECT_EQ(-1, daughter_id_1);
+    db.RemoveStrand(strand_id_0);
   }
 
   TEST(cFSMDB, JoinStrands){
