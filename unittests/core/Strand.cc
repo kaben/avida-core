@@ -1374,6 +1374,130 @@ namespace nFSMDBTests {
     EXPECT_EQ(0, db.m_bindables.GetSize());
   }
 
+  TEST(cFSMDB, RemoveSubstrand){
+    int rng_seed = 0;
+    cFSMDBTestFixture db(rng_seed);
+    db.m_label_utils.m_max_label_size = 6;
+    int strand_id_0 = db.CreateStrand();
+    int strand_id_1 = db.CreateStrand();
+    db.AssociateSeqToStrand(strand_id_0, "aaaaaagbbbbbbnopqrstuvwxcccccc");
+    db.AssociateSeqToStrand(strand_id_1, "aaaaaagddddddnopqrstuvwxcccccc");
+    db.Collide(strand_id_0, strand_id_1);
+    /*
+    There should now be two strands and two sequences. The two strands should
+    be bound at three locations, making six half bindings.
+    */
+    EXPECT_EQ(2, db.m_bindables.GetSize());
+    EXPECT_EQ(2, db.m_seqs.GetSize());
+    EXPECT_EQ(6, db.m_half_bindings.GetSize());
+
+    int daughter_id_0 = -1, daughter_id_1 = -1;
+    db.RemoveSubstrand(strand_id_0, 7, 13, daughter_id_0, daughter_id_1);
+    cStrand *d0(db.m_bindables.Get<cStrand>(daughter_id_0));
+    cStrand *d1(db.m_bindables.Get<cStrand>(daughter_id_1));
+    /*
+    Strand 0 has been split into two daughter strands. One of the three
+    bindings was located across the splitting boundary, so should not have
+    survived the splitting. The other two bindings should have survived; now
+    each daughter should have its own binding to strand 1. There should now be
+    three strands, three sequences, and four half bindings.
+    */
+    EXPECT_EQ("aaaaaag", d0->AsString(db));
+    EXPECT_TRUE(d0->m_bindpts.Has(0));
+    EXPECT_EQ("nopqrstuvwxcccccc", d1->AsString(db));
+    EXPECT_TRUE(d1->m_bindpts.Has(14));
+    EXPECT_EQ(3, db.m_bindables.GetSize());
+    EXPECT_EQ(3, db.m_seqs.GetSize());
+    EXPECT_EQ(4, db.m_half_bindings.GetSize());
+
+    db.RemoveStrand(daughter_id_0);
+    /*
+    One of the daughter strands has been deleted, so its binding should also be
+    deleted. The other daughter should still be bound to strand 1. There should
+    remain two strands, two sequences, and two half bindings.
+    */
+    EXPECT_EQ(2, db.m_bindables.GetSize());
+    EXPECT_EQ(2, db.m_seqs.GetSize());
+    EXPECT_EQ(2, db.m_half_bindings.GetSize());
+
+    db.RemoveStrand(daughter_id_1);
+    /*
+    Now that the second daughter has been deleted, there should be no more
+    bindings to strand 1. There should remain one strand and one sequence, but
+    no half bindings.
+    */
+    EXPECT_EQ(1, db.m_bindables.GetSize());
+    EXPECT_EQ(1, db.m_seqs.GetSize());
+    EXPECT_EQ(0, db.m_half_bindings.GetSize());
+
+    db.RemoveStrand(strand_id_1);
+    /*
+    The final strand has been removed. There should be no strands, sequences,
+    or half bindings.
+    */
+    EXPECT_EQ(0, db.m_bindables.GetSize());
+    EXPECT_EQ(0, db.m_seqs.GetSize());
+    EXPECT_EQ(0, db.m_half_bindings.GetSize());
+  }
+
+  TEST(cFSMDB, RemoveSubstrand_before_start){
+    int rng_seed = 0;
+    cFSMDBTestFixture db(rng_seed);
+    db.m_label_utils.m_max_label_size = 6;
+    int strand_id_0 = db.CreateStrand();
+    db.AssociateSeqToStrand(strand_id_0, "aaaaaagbbb");
+    int daughter_id_0 = -1, daughter_id_1 = -1;
+    db.RemoveSubstrand(strand_id_0, 0, 0, daughter_id_0, daughter_id_1);
+    EXPECT_EQ(strand_id_0, daughter_id_1);
+    EXPECT_EQ(-1, daughter_id_0);
+    db.RemoveSubstrand(strand_id_0, -1, -1, daughter_id_0, daughter_id_1);
+    EXPECT_EQ(strand_id_0, daughter_id_1);
+    EXPECT_EQ(-1, daughter_id_0);
+    db.RemoveStrand(strand_id_0);
+  }
+
+  TEST(cFSMDB, RemoveSubstrand_after_end){
+    int rng_seed = 0;
+    cFSMDBTestFixture db(rng_seed);
+    db.m_label_utils.m_max_label_size = 6;
+    int strand_id_0 = db.CreateStrand();
+    db.AssociateSeqToStrand(strand_id_0, "aaaaaagbbb");
+    int daughter_id_0 = -1, daughter_id_1 = -1;
+    db.RemoveSubstrand(strand_id_0, 10, 10, daughter_id_0, daughter_id_1);
+    EXPECT_EQ(strand_id_0, daughter_id_0);
+    EXPECT_EQ(-1, daughter_id_1);
+    db.RemoveSubstrand(strand_id_0, 11, 11, daughter_id_0, daughter_id_1);
+    EXPECT_EQ(strand_id_0, daughter_id_0);
+    EXPECT_EQ(-1, daughter_id_1);
+    db.RemoveStrand(strand_id_0);
+  }
+
+  TEST(cFSMDB, RemoveSubstrand_including_start){
+    int rng_seed = 0;
+    cFSMDBTestFixture db(rng_seed);
+    db.m_label_utils.m_max_label_size = 6;
+    int strand_id_0 = db.CreateStrand();
+    db.AssociateSeqToStrand(strand_id_0, "abcdef");
+    int d0 = -1, d1 = -1;
+    db.RemoveSubstrand(strand_id_0, -1, 3, d0, d1);
+    EXPECT_EQ(-1, d0);
+    EXPECT_EQ("def", db.m_bindables.Get<cStrand>(d1)->AsString(db));
+    db.RemoveStrand(d1);
+  }
+
+  TEST(cFSMDB, RemoveSubstrand_including_end){
+    int rng_seed = 0;
+    cFSMDBTestFixture db(rng_seed);
+    db.m_label_utils.m_max_label_size = 6;
+    int strand_id_0 = db.CreateStrand();
+    db.AssociateSeqToStrand(strand_id_0, "abcdef");
+    int d0 = -1, d1 = -1;
+    db.RemoveSubstrand(strand_id_0, 3, 7, d0, d1);
+    EXPECT_EQ("abc", db.m_bindables.Get<cStrand>(d0)->AsString(db));
+    EXPECT_EQ(-1, d1);
+    db.RemoveStrand(d0);
+  }
+
   TEST(cFSMDB, SplitStrand){
     int rng_seed = 0;
     cFSMDBTestFixture db(rng_seed);

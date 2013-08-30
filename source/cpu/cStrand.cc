@@ -725,40 +725,47 @@ void cFSMDB::RemoveStrand(int strand_id) {
   /* Delete strand. */
   m_bindables.Delete(strand_id);
 }
-void cFSMDB::SplitStrand(int strand_id, int at_pos, int &ret_d0_id, int &ret_d1_id) {
+void cFSMDB::RemoveSubstrand(int strand_id, int from_pos, int to_pos, int &ret_d0_id, int &ret_d1_id) {
   cStrand* par = m_bindables.Get<cStrand>(strand_id); assert(NULL != par);
   Apto::String par_str(par->AsString(*this));
   int par_len = par_str.GetSize(); 
-  if (at_pos <= 0) {
+  if (par_len <= from_pos) {
     /*
-    If split position is before start of parent strand, the first daughter will
-    be an (invalid) empty strand, and the second daughter will be identical to
-    the parent strand.
-    */
-    ret_d1_id = strand_id;
-    return;
-  }
-  if (par_len <= at_pos) {
-    /*
-    If split position is after end of parent strand, the first daughter will be
-    identical to the parent strand, and the second daughter will be an
-    (invalid) empty strand.
+    If first split point is after end of parent strand, first daughter will be
+    identical to parent strand, and second daughter will be an (invalid) empty
+    strand.
     */
     ret_d0_id = strand_id;
     return;
   }
-  ret_d0_id = CreateStrand(par_str.Substring(0, at_pos));
-  ret_d1_id = CreateStrand(par_str.Substring(at_pos));
-  cStrand *d0 = m_bindables.Get<cStrand>(ret_d0_id);
-  cStrand *d1 = m_bindables.Get<cStrand>(ret_d1_id);
+  if (to_pos <= 0) {
+    /*
+    If second split point is before start of parent strand, first daughter will
+    be an (invalid) empty strand, and second daughter will be identical to
+    parent strand.
+    */
+    ret_d1_id = strand_id;
+    return;
+  }
+  /* Restrict cut to within strand. */
+  if (from_pos < 0) { from_pos = 0; }
+  if (par_len < to_pos) { to_pos = par_len; }
+  /* First daughter must not be empty. */
+  if (0 < from_pos) { ret_d0_id = CreateStrand(par_str.Substring(0, from_pos)); }
+  /* Second daughter must not be empty. */
+  if (to_pos < par_len) { ret_d1_id = CreateStrand(par_str.Substring(to_pos)); }
 
+  cStrand *d0(0), *d1(0);
+  if (0 <= ret_d0_id) { d0 = m_bindables.Get<cStrand>(ret_d0_id); }
+  if (0 <= ret_d1_id) { d1 = m_bindables.Get<cStrand>(ret_d1_id); }
   /*
   Convert daughters' pos-(label-array) maps to pos-(label-set) maps. The latter
   will allow us to use Has() to check whether a label appears at the given
   position in the daughter.
   */
-  Apto::Map<int, Apto::Set<int> > d0_lbls(AsSetMap(d0->GetLabels(*this)));
-  Apto::Map<int, Apto::Set<int> > d1_lbls(AsSetMap(d1->GetLabels(*this)));
+  Apto::Map<int, Apto::Set<int> > d0_lbls, d1_lbls;
+  if (d0) { d0_lbls = AsSetMap(d0->GetLabels(*this)); }
+  if (d1) { d1_lbls = AsSetMap(d1->GetLabels(*this)); }
   /* Extract a list of half binding IDs from the parent. */
   Apto::Set<int> par_hb_ids(CollapseSetMap(par->m_bindpts));
   /* Remove half bindings from parent. */
@@ -771,16 +778,16 @@ void cFSMDB::SplitStrand(int strand_id, int at_pos, int &ret_d0_id, int &ret_d1_
     int pos = hb->m_lbl_pos;
     int len = hb->m_lbl_len;
     bool found = false;
-    if (pos < at_pos) {
+    if (pos < from_pos) {
       /* Transfer to daughter 0. */
       if (d0_lbls.Has(id) && d0_lbls[id].Has(pos)) {
         found = true;
         hb->m_parent_id = ret_d0_id;
         for (int i=0; i < len; i++) { d0->m_bindpts[pos+i].Insert(hb_id); }
       }
-    } else {
+    } else if (to_pos <= pos) {
       /* Transfer to daughter 1. */
-      int ofs_pos = pos - at_pos;
+      int ofs_pos = pos - to_pos;
       if (d1_lbls.Has(id) && d1_lbls[id].Has(ofs_pos)) {
         found = true;
         hb->m_parent_id = ret_d1_id;
@@ -804,6 +811,9 @@ void cFSMDB::SplitStrand(int strand_id, int at_pos, int &ret_d0_id, int &ret_d1_
   }
   /* Delete parent strand. */
   RemoveStrand(strand_id);
+}
+void cFSMDB::SplitStrand(int strand_id, int at_pos, int &ret_d0_id, int &ret_d1_id) {
+  RemoveSubstrand(strand_id, at_pos, at_pos, ret_d0_id, ret_d1_id);
 }
 void cFSMDB::JoinStrands(int strand_0_id, int strand_1_id, int &ret_daughter_id) {
   cStrand* p0 = m_bindables.Get<cStrand>(strand_0_id); assert(NULL != p0);

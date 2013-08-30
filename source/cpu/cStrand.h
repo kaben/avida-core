@@ -94,8 +94,12 @@ namespace Apto {
   }
   template <class T> Set<T> SetUnion(const Set<T> &a, const Set<T> &b) {
     Set<T> s(a);
+    for (typename Set<T>::ConstIterator i = a.Begin(); i.Next();) { s.Insert(*i.Get()); }
     for (typename Set<T>::ConstIterator i = b.Begin(); i.Next();) { s.Insert(*i.Get()); }
     return s;
+  }
+  template <class T> void SetSubsume(Set<T> &s, const Set<T> &rhs) {
+    for (typename Set<T>::ConstIterator i = rhs.Begin(); i.Next();) { s.Insert(*i.Get()); }
   }
 
   namespace Scheduler {
@@ -600,6 +604,7 @@ public:
   int CreateStrand(const Apto::String &sequence);
   void AssociateSeqToStrand(int strand_id, const Apto::String &seq);
   void RemoveStrand(int strand_id);
+  void RemoveSubstrand(int strand_id, int from_pos, int to_pos, int &ret_d0_id, int &ret_d1_id);
   void SplitStrand(int strand_id, int at_position, int &ret_d0_id, int &ret_d1_id);
   void JoinStrands(int strand_0_id, int strand_1_id, int &ret_daughter_id);
 
