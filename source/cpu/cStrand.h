@@ -56,23 +56,48 @@ class cSequence;
 class cStrand;
 template <class T> class ObjIdx;
 
-Apto::Array<cHit, Apto::Smart> bScanForLabels(const Apto::String&, const cBasicLabelUtils&);
-
-
 typedef Apto::Functor<void, Apto::TL::Create<int> > FSMFunctor;
 
-template <class T> Apto::Set<T> AsSet(Apto::Array<T> &ary) {
-  Apto::Set<T> set;
-  for (int i=0; i < ary.GetSize(); i++) { set.Insert(ary[i]); }
-  return set;
-}
-template <class T> Apto::Array<T> AsArray(Apto::Set<T> &set) {
-  Apto::Array<T> ary;
-  for (typename Apto::Set<T>::Iterator it = set.Begin(); it.Next();) { ary.Push(*it.Get()); }
-  return ary;
-}
+Apto::Array<cHit, Apto::Smart> bScanForLabels(const Apto::String&, const cBasicLabelUtils&);
 
 namespace Apto {
+  
+  template <class T> Set<T> AsSet(Array<T> &a) {
+    Set<T> s;
+    for (int i=0; i < a.GetSize(); i++) { s.Insert(a[i]); }
+    return s;
+  }
+  template <class T> Array<T> AsArray(Set<T> &s) {
+    Array<T> a;
+    for (typename Set<T>::Iterator i = s.Begin(); i.Next();) { a.Push(*i.Get()); }
+    return a;
+  }
+  template <class T, class U> Map<T, Array<U> > AsArrayMap(Map<T, Set<U> > &sm) {
+    Map<T, Array<U> > am;
+    for (typename Map<T, Set<U> >::KeyIterator i = sm.Keys(); i.Next();)
+    { am[*i.Get()] = AsArray(sm[*i.Get()]); }
+    return am;
+  }
+  template <class T, class U> Map<T, Set<U> > AsSetMap(Map<T, Array<U> > &am) {
+    Map<T, Set<U> > sm;
+    for (typename Map<T, Array<U> >::KeyIterator i = am.Keys(); i.Next();)
+    { sm[*i.Get()] = AsSet(am[*i.Get()]); }
+    return sm;
+  }
+  template <class T, class U> Set<U> CollapseSetMap(Map<T, Set<U> > &sm) {
+    Set<U> s;
+    for (typename Map<T, Set<U> >::KeyIterator i = sm.Keys(); i.Next();) {
+      for (typename Set<U>::Iterator j = sm[*i.Get()].Begin(); j.Next();)
+      { s.Insert(*j.Get()); }
+    }
+    return s;
+  }
+  template <class T> Set<T> SetUnion(const Set<T> &a, const Set<T> &b) {
+    Set<T> s(a);
+    for (typename Set<T>::ConstIterator i = b.Begin(); i.Next();) { s.Insert(*i.Get()); }
+    return s;
+  }
+
   namespace Scheduler {
     class ProbabilisticDynamic : public PriorityScheduler {
     protected:

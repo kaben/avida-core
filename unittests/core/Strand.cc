@@ -1433,6 +1433,58 @@ namespace nFSMDBTests {
     EXPECT_EQ(0, db.m_seqs.GetSize());
     EXPECT_EQ(0, db.m_half_bindings.GetSize());
   }
+
+  TEST(cFSMDB, JoinStrands){
+    int rng_seed = 0;
+    cFSMDBTestFixture db(rng_seed);
+    db.m_label_utils.m_max_label_size = 6;
+    int sid0 = db.CreateStrand(), sid1 = db.CreateStrand(), sid2 = db.CreateStrand();
+    db.AssociateSeqToStrand(sid0, "aaaaaagbbbbbb");
+    db.AssociateSeqToStrand(sid1, "nopqrstuvwxcccccc");
+    db.AssociateSeqToStrand(sid2, "aaaaaagddddddnopqrstuvwxcccccc");
+    db.Collide(sid0, sid2);
+    db.Collide(sid1, sid2);
+    /*
+    There should now be three strands and three sequences. The first strand
+    should be bound to the third strand at two locations, and the second strand
+    should be bound to third strand at a single location, making six half
+    bindings.
+    */
+    EXPECT_EQ(3, db.m_bindables.GetSize());
+    EXPECT_EQ(3, db.m_seqs.GetSize());
+    EXPECT_EQ(6, db.m_half_bindings.GetSize());
+
+    int daughter_id = -1;
+    db.JoinStrands(sid0, sid1, daughter_id);
+    /*
+    The first and second strands have been joined into a single daughter
+    strand. All three bindings should have been transferred to the daughter
+    strand. There should now be two strands, two sequences, and six half
+    bindings.
+    */
+    EXPECT_EQ(2, db.m_bindables.GetSize());
+    EXPECT_EQ(2, db.m_seqs.GetSize());
+    EXPECT_EQ(6, db.m_half_bindings.GetSize());
+
+    db.RemoveStrand(daughter_id);
+    /*
+    The daughter strand has been deleted, so all of its bindings should also be
+    deleted. There should remain one strand, one sequence, and no half
+    bindings.
+    */
+    EXPECT_EQ(1, db.m_bindables.GetSize());
+    EXPECT_EQ(1, db.m_seqs.GetSize());
+    EXPECT_EQ(0, db.m_half_bindings.GetSize());
+
+    db.RemoveStrand(sid2);
+    /*
+    The final strand has been removed. There should be no strands, sequences,
+    or half bindings.
+    */
+    EXPECT_EQ(0, db.m_bindables.GetSize());
+    EXPECT_EQ(0, db.m_seqs.GetSize());
+    EXPECT_EQ(0, db.m_half_bindings.GetSize());
+  }
 }
 
 
@@ -1450,7 +1502,7 @@ namespace nContainerConversion {
     for (int i=0; i<100; i++) { EXPECT_EQ(0, ary[i]); }
   }
 
-  TEST(ContainerConversion, DISABLED_Set_AsArray){
+  TEST(ContainerConversion, Set_AsArray){
     /* This test fails for sets of size > 92. See regressions below.  */
     Apto::Set<int> set;
     for (int i=0; i<92; i++) { set.Insert(i); }
@@ -1464,12 +1516,12 @@ namespace nContainerConversion {
   }
 
   /* Note: 93 = (4 * HashSize) + 1. */
-  TEST(Set, DISABLED_regression_in_Remove) {
+  TEST(Set, regression_in_Remove) {
     Apto::Set<int> set;
     for (int i=0; i<93; i++) { set.Insert(i); }
     for (int i=0; i<93; i++) { set.Remove(i); }
   }
-  TEST(Map, DISABLED_regression_in_Remove) {
+  TEST(Map, regression_in_Remove) {
     Apto::Map<int, int> map;
     for (int i=0; i<93; i++) { map.Set(i, i); }
     for (int i=0; i<93; i++) { map.Remove(i); }
