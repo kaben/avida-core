@@ -726,7 +726,9 @@ void cFSMDB::RemoveStrand(int strand_id) {
   m_bindables.Delete(strand_id);
 }
 void cFSMDB::RemoveSubstrand(int strand_id, int from_pos, int to_pos, int &ret_d0_id, int &ret_d1_id) {
-  cStrand* par = m_bindables.Get<cStrand>(strand_id); assert(NULL != par);
+  cStrand* par = m_bindables.Get<cStrand>(strand_id);
+  if (NULL == par) { return; }
+
   Apto::String par_str(par->AsString(*this));
   int par_len = par_str.GetSize(); 
   if (par_len <= from_pos) {
@@ -816,8 +818,9 @@ void cFSMDB::SplitStrand(int strand_id, int at_pos, int &ret_d0_id, int &ret_d1_
   RemoveSubstrand(strand_id, at_pos, at_pos, ret_d0_id, ret_d1_id);
 }
 void cFSMDB::JoinStrands(int strand_0_id, int strand_1_id, int &ret_daughter_id) {
-  cStrand* p0 = m_bindables.Get<cStrand>(strand_0_id); assert(NULL != p0);
-  cStrand* p1 = m_bindables.Get<cStrand>(strand_1_id); assert(NULL != p1);
+  cStrand* p0 = m_bindables.Get<cStrand>(strand_0_id);
+  cStrand* p1 = m_bindables.Get<cStrand>(strand_1_id);
+  if ((NULL == p0) || (NULL == p1)) { return; }
   Apto::String p0_str(p0->AsString(*this)), p1_str(p1->AsString(*this));
   int p0_len = p0_str.GetSize(), p1_len = p1_str.GetSize();
   ret_daughter_id = CreateStrand(p0_str+p1_str);
@@ -856,6 +859,20 @@ void cFSMDB::JoinStrands(int strand_0_id, int strand_1_id, int &ret_daughter_id)
   /* Delete parent strands. */
   RemoveStrand(strand_0_id);
   RemoveStrand(strand_1_id);
+}
+void cFSMDB::InsertSubstrand(int strand_id, int substrand_id, int at_position, int &ret_daughter_id) {
+  int l_id = -1, r_id = -1;
+  SplitStrand(strand_id, at_position, l_id, r_id);
+  if (0 <= l_id) { JoinStrands(l_id, substrand_id, substrand_id); }
+  if (0 <= r_id) { JoinStrands(substrand_id, r_id, substrand_id); }
+  ret_daughter_id = substrand_id;
+}
+void cFSMDB::AlterSubstrand(int strand_id, int new_substrand_id, int from_pos, int to_pos, int &ret_daughter_id) {
+  int l_id = -1, r_id = -1;
+  RemoveSubstrand(strand_id, from_pos, to_pos, l_id, r_id);
+  if (0 <= l_id) { JoinStrands(l_id, new_substrand_id, new_substrand_id); }
+  if (0 <= r_id) { JoinStrands(new_substrand_id, r_id, new_substrand_id); }
+  ret_daughter_id = new_substrand_id;
 }
 int cFSMDB::CreateFSMBootstrap() {
   cFSMBootstrap* ptr = m_bindables.Create<cFSMBootstrap>();

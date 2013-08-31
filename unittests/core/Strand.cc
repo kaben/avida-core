@@ -1647,6 +1647,96 @@ namespace nFSMDBTests {
     EXPECT_EQ(0, db.m_seqs.GetSize());
     EXPECT_EQ(0, db.m_half_bindings.GetSize());
   }
+
+  TEST(cFSMDB, InsertSubstrand_middle){
+    cFSMDBTestFixture db;
+    int sid0 = db.CreateStrand(), sid1 = db.CreateStrand();
+    db.AssociateSeqToStrand(sid0, "abcdef");
+    db.AssociateSeqToStrand(sid1, "xxx");
+    int d_id;
+    db.InsertSubstrand(sid0, sid1, 3, d_id);
+    EXPECT_EQ("abcxxxdef", db.m_bindables.Get<cStrand>(d_id)->AsString(db));
+    EXPECT_EQ(1, db.m_bindables.GetSize());
+    EXPECT_EQ(1, db.m_seqs.GetSize());
+    db.RemoveStrand(d_id);
+    EXPECT_EQ(0, db.m_bindables.GetSize());
+    EXPECT_EQ(0, db.m_seqs.GetSize());
+  }
+
+  TEST(cFSMDB, InsertSubstrand_start){
+    cFSMDBTestFixture db;
+    int sid0 = db.CreateStrand(), sid1 = db.CreateStrand();
+    db.AssociateSeqToStrand(sid0, "abcdef");
+    db.AssociateSeqToStrand(sid1, "xxx");
+    int d_id;
+    db.InsertSubstrand(sid0, sid1, 0, d_id);
+    EXPECT_EQ("xxxabcdef", db.m_bindables.Get<cStrand>(d_id)->AsString(db));
+    EXPECT_EQ(1, db.m_bindables.GetSize());
+    EXPECT_EQ(1, db.m_seqs.GetSize());
+    db.RemoveStrand(d_id);
+    EXPECT_EQ(0, db.m_bindables.GetSize());
+    EXPECT_EQ(0, db.m_seqs.GetSize());
+  }
+
+  TEST(cFSMDB, InsertSubstrand_end){
+    cFSMDBTestFixture db;
+    int sid0 = db.CreateStrand(), sid1 = db.CreateStrand();
+    db.AssociateSeqToStrand(sid0, "abcdef");
+    db.AssociateSeqToStrand(sid1, "xxx");
+    int d_id;
+    db.InsertSubstrand(sid0, sid1, 6, d_id);
+    EXPECT_EQ("abcdefxxx", db.m_bindables.Get<cStrand>(d_id)->AsString(db));
+    EXPECT_EQ(1, db.m_bindables.GetSize());
+    EXPECT_EQ(1, db.m_seqs.GetSize());
+    db.RemoveStrand(d_id);
+    EXPECT_EQ(0, db.m_bindables.GetSize());
+    EXPECT_EQ(0, db.m_seqs.GetSize());
+  }
+
+  TEST(cFSMDB, AlterSubstrand_middle){
+    cFSMDBTestFixture db;
+    int sid0 = db.CreateStrand(), sid1 = db.CreateStrand();
+    db.AssociateSeqToStrand(sid0, "abcdef");
+    db.AssociateSeqToStrand(sid1, "xxx");
+    int d_id;
+    db.AlterSubstrand(sid0, sid1, 2, 4, d_id);
+    EXPECT_EQ("abxxxef", db.m_bindables.Get<cStrand>(d_id)->AsString(db));
+    EXPECT_EQ(1, db.m_bindables.GetSize());
+    EXPECT_EQ(1, db.m_seqs.GetSize());
+    db.RemoveStrand(d_id);
+    EXPECT_EQ(0, db.m_bindables.GetSize());
+    EXPECT_EQ(0, db.m_seqs.GetSize());
+  }
+
+  TEST(cFSMDB, AlterSubstrand_start){
+    cFSMDBTestFixture db;
+    int sid0 = db.CreateStrand(), sid1 = db.CreateStrand();
+    db.AssociateSeqToStrand(sid0, "abcdef");
+    db.AssociateSeqToStrand(sid1, "xxx");
+    int d_id;
+    db.AlterSubstrand(sid0, sid1, -1, 2, d_id);
+    EXPECT_EQ("xxxcdef", db.m_bindables.Get<cStrand>(d_id)->AsString(db));
+    EXPECT_EQ(1, db.m_bindables.GetSize());
+    EXPECT_EQ(1, db.m_seqs.GetSize());
+    db.RemoveStrand(d_id);
+    EXPECT_EQ(0, db.m_bindables.GetSize());
+    EXPECT_EQ(0, db.m_seqs.GetSize());
+  }
+
+  TEST(cFSMDB, AlterSubstrand_end){
+    cFSMDBTestFixture db;
+    int sid0 = db.CreateStrand(), sid1 = db.CreateStrand();
+    db.AssociateSeqToStrand(sid0, "abcdef");
+    db.AssociateSeqToStrand(sid1, "xxx");
+    int d_id;
+    db.AlterSubstrand(sid0, sid1, 4, 7, d_id);
+    EXPECT_EQ("abcdxxx", db.m_bindables.Get<cStrand>(d_id)->AsString(db));
+    EXPECT_EQ(1, db.m_bindables.GetSize());
+    EXPECT_EQ(1, db.m_seqs.GetSize());
+    db.RemoveStrand(d_id);
+    EXPECT_EQ(0, db.m_bindables.GetSize());
+    EXPECT_EQ(0, db.m_seqs.GetSize());
+  }
 }
 
 

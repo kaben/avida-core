@@ -604,9 +604,12 @@ public:
   int CreateStrand(const Apto::String &sequence);
   void AssociateSeqToStrand(int strand_id, const Apto::String &seq);
   void RemoveStrand(int strand_id);
+
   void RemoveSubstrand(int strand_id, int from_pos, int to_pos, int &ret_d0_id, int &ret_d1_id);
   void SplitStrand(int strand_id, int at_position, int &ret_d0_id, int &ret_d1_id);
   void JoinStrands(int strand_0_id, int strand_1_id, int &ret_daughter_id);
+  void InsertSubstrand(int strand_id, int substrand_id, int at_position, int &ret_daughter_id);
+  void AlterSubstrand(int strand_id, int new_substrand_id, int from_pos, int to_pos, int &ret_daughter_id);
 
   int CreateFSMBootstrap();
 
