@@ -35,6 +35,60 @@ using namespace std;
 
 
 /*
+BOOKMARK 20130830-2017
+- I think I need to decouple the ideas of labels and bindings. The reason is
+  that I want to be able to bind state machines and strands at strand locations
+  lacking labels.
+  
+  I would like to have the state machine read a strand symbol at the binding
+  point, and then move the binding point by one position. Or, similarly, have
+  the state machine append to the strand's bound reverse complement, and then
+  move the binding point by one position.
+
+- To understand binding, and how to disentangle labels from binding, I'd like
+  to study the Collide() method (which I wrote... so I should be able to
+  understand it...)
+
+  - First we pick a strand, get its sequence, then walk through all of the
+    sequence's labels. For each label we do the following:
+    - Get its complement.
+    - Check to see whether the other strand contains the complement.
+    - If so, we remember the label as "bindable".
+  - We sort the bindable labels by length.
+  - Then, starting with the longest labels, we go through each set of lengths,
+    and for each length, we do the follosing:
+    - for each label and its complement, we do the following:
+      - We find every position of the label.
+      - We find every position of the complement.
+      - For every combination of label position and complement position, we make
+        a candidate pair of half bindings.
+    - We then shuffle all pairs of bindings.
+    - We then iterate through the pairs in the shuffled list, and for each
+      pair, we do the following:
+      - We find the positions of each half of the candidate binding.
+      - We check to see whether the positions are still available in each
+        strand. If so, we flip a loaded coin (loaded based on label length) to
+        see whether the binding succeeds.
+      - If the binding succeeds, we insert the binding halves into their two
+        strands at their designated positions, so we can keep track of which
+        positions are taken, and which are still available.
+      - But if the binding fails, we delete both halves of the binding.
+
+  It strikes me that I can use two separate data structures: one used solely
+  for the collision process, which will be nearly identical to the structure
+  I'm using now, except it won't be tracked by the database; and a simpler
+  structure, which lacks label information, and which is tracked by the
+  database. When I use the latter data structure, I will need to find another
+  way to determine whether bindings survive substrand deletions. I will simply
+  need to check whether the binding crosses the cut boundary.
+
+- Next steps, then:
+  - Separate bindings and labels, as described above.
+  - Now NFAs may still have labels determining where to bind to strands
+    initially -- alternatively, or perhaps in addition, some other state
+    machine can bind an NFA to a strand -- but NFAs will also have bindpoints,
+    and these bindpoints may have various heads associated with them.
+
 BOOKMARK 20130828-2128
 - Currently working on cFSMDB::JoinStrands(). See info in BOOKMARK
   20130827-1913 regarding the joining operation.
