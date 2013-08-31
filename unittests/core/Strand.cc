@@ -230,7 +230,7 @@ BOOKMARK 20130827-1256
     - before head.
     - before and after head.
   - deletion.
-    - delete at head, and lyse before and after head.
+    - delete at head, and split before and after head.
     - delete at head and move head to next symbol.
     - delete at head and move head to previous symbol.
     - possible: delete substring relative to head.
@@ -869,7 +869,7 @@ namespace nFSMDBTests {
   };
 
 
-  TEST(cFSMdb, instantiation){
+  TEST(cFSMDB, instantiation){
     cFSMDBTestFixture db;
     /* Simple check to make sure instantiation works. */
     /* Call methods to ensure instantiation of template class. */
@@ -1737,6 +1737,164 @@ namespace nFSMDBTests {
     EXPECT_EQ(0, db.m_bindables.GetSize());
     EXPECT_EQ(0, db.m_seqs.GetSize());
   }
+
+  TEST(cFSMDB, InsertSubstrand){
+    int rng_seed = 0;
+    cFSMDBTestFixture db(rng_seed);
+    db.m_label_utils.m_max_label_size = 6;
+    int sid0 = db.CreateStrand(), sid1 = db.CreateStrand(), sid2 = db.CreateStrand();
+    db.AssociateSeqToStrand(sid0, "aaaaaagnopqrstuvwxcccccc");
+    db.AssociateSeqToStrand(sid1, "bbbbbb");
+    db.AssociateSeqToStrand(sid2, "aaaaaagddddddnopqrstuvwxcccccc");
+    db.Collide(sid0, sid2);
+    db.Collide(sid1, sid2);
+    /*
+    There should now be three strands and three sequences. The first strand
+    should be bound to the third strand at two locations, and the second strand
+    should be bound to third strand at a single location, making six half
+    bindings.
+    */
+    EXPECT_EQ(3, db.m_bindables.GetSize());
+    EXPECT_EQ(3, db.m_seqs.GetSize());
+    EXPECT_EQ(6, db.m_half_bindings.GetSize());
+
+    int daughter_id = -1;
+    db.InsertSubstrand(sid0, sid1, 7, daughter_id);
+    /*
+    The second strand has been inserted into the first strand forming a single
+    daughter strand. All three bindings should have been transferred to the
+    daughter strand. There should now be two strands, two sequences, and six
+    half bindings.
+    */
+    EXPECT_EQ(2, db.m_bindables.GetSize());
+    EXPECT_EQ(2, db.m_seqs.GetSize());
+    EXPECT_EQ(6, db.m_half_bindings.GetSize());
+
+    db.RemoveStrand(daughter_id);
+    /*
+    The daughter strand has been deleted, so all of its bindings should also be
+    deleted. There should remain one strand, one sequence, and no half
+    bindings.
+    */
+    EXPECT_EQ(1, db.m_bindables.GetSize());
+    EXPECT_EQ(1, db.m_seqs.GetSize());
+    EXPECT_EQ(0, db.m_half_bindings.GetSize());
+
+    db.RemoveStrand(sid2);
+    /*
+    The final strand has been removed. There should be no strands, sequences,
+    or half bindings.
+    */
+    EXPECT_EQ(0, db.m_bindables.GetSize());
+    EXPECT_EQ(0, db.m_seqs.GetSize());
+    EXPECT_EQ(0, db.m_half_bindings.GetSize());
+  }
+
+  TEST(cFSMDB, AlterSubstrand_0){
+    int rng_seed = 0;
+    cFSMDBTestFixture db(rng_seed);
+    db.m_label_utils.m_max_label_size = 6;
+    int sid0 = db.CreateStrand(), sid1 = db.CreateStrand(), sid2 = db.CreateStrand();
+    db.AssociateSeqToStrand(sid0, "aaaaaagbbbbbbnopqrstuvwxcccccc");
+    db.AssociateSeqToStrand(sid1, "xxx");
+    db.AssociateSeqToStrand(sid2, "aaaaaagddddddnopqrstuvwxcccccc");
+    db.Collide(sid0, sid2);
+    /*
+    There should now be three strands and three sequences. The first strand
+    should be bound to the third strand at two locations, and the second strand
+    should be bound to third strand at a single location, making six half
+    bindings.
+    */
+    EXPECT_EQ(3, db.m_bindables.GetSize());
+    EXPECT_EQ(3, db.m_seqs.GetSize());
+    EXPECT_EQ(6, db.m_half_bindings.GetSize());
+
+    int daughter_id = -1;
+    db.AlterSubstrand(sid0, sid1, 7, 13, daughter_id);
+    /*
+    The first strand's 6-symbol substring from positions 7-13 has been
+    rewritten with the contents of the second strand, forming a single daughter
+    strand. The altered substrand contained a binding which should have been
+    destroyed, but the original strand's bindings at the start and end should
+    have survived. There should now be two strands, two sequences, and four
+    half bindings.
+    */
+    EXPECT_EQ(2, db.m_bindables.GetSize());
+    EXPECT_EQ(2, db.m_seqs.GetSize());
+    EXPECT_EQ(4, db.m_half_bindings.GetSize());
+
+    db.RemoveStrand(daughter_id);
+    /*
+    The daughter strand has been deleted, so all of its bindings should also be
+    deleted. There should remain one strand, one sequence, and no half
+    bindings.
+    */
+    EXPECT_EQ(1, db.m_bindables.GetSize());
+    EXPECT_EQ(1, db.m_seqs.GetSize());
+    EXPECT_EQ(0, db.m_half_bindings.GetSize());
+
+    db.RemoveStrand(sid2);
+    /*
+    The final strand has been removed. There should be no strands, sequences,
+    or half bindings.
+    */
+    EXPECT_EQ(0, db.m_bindables.GetSize());
+    EXPECT_EQ(0, db.m_seqs.GetSize());
+    EXPECT_EQ(0, db.m_half_bindings.GetSize());
+  }
+
+  TEST(cFSMDB, AlterSubstrand_1){
+    int rng_seed = 0;
+    cFSMDBTestFixture db(rng_seed);
+    db.m_label_utils.m_max_label_size = 6;
+    int sid0 = db.CreateStrand(), sid1 = db.CreateStrand(), sid2 = db.CreateStrand();
+    db.AssociateSeqToStrand(sid0, "aaaaaagxxxnopqrstuvwxcccccc");
+    db.AssociateSeqToStrand(sid1, "bbbbbb");
+    db.AssociateSeqToStrand(sid2, "aaaaaagddddddnopqrstuvwxcccccc");
+    db.Collide(sid0, sid2);
+    db.Collide(sid1, sid2);
+    /*
+    There should now be three strands and three sequences. The first strand
+    should be bound to the third strand at two locations, and the second strand
+    should be bound to third strand at a single location, making six half
+    bindings.
+    */
+    EXPECT_EQ(3, db.m_bindables.GetSize());
+    EXPECT_EQ(3, db.m_seqs.GetSize());
+    EXPECT_EQ(6, db.m_half_bindings.GetSize());
+
+    int daughter_id = -1;
+    db.AlterSubstrand(sid0, sid1, 7, 10, daughter_id);
+    /*
+    The second strand has been inserted into the first strand, replacing the
+    symbols at positions 7-10, and forming a single daughter strand. All three
+    bindings should have been transferred to the daughter strand. There should
+    now be two strands, two sequences, and six half bindings.
+    */
+    EXPECT_EQ(2, db.m_bindables.GetSize());
+    EXPECT_EQ(2, db.m_seqs.GetSize());
+    EXPECT_EQ(6, db.m_half_bindings.GetSize());
+
+    db.RemoveStrand(daughter_id);
+    /*
+    The daughter strand has been deleted, so all of its bindings should also be
+    deleted. There should remain one strand, one sequence, and no half
+    bindings.
+    */
+    EXPECT_EQ(1, db.m_bindables.GetSize());
+    EXPECT_EQ(1, db.m_seqs.GetSize());
+    EXPECT_EQ(0, db.m_half_bindings.GetSize());
+
+    db.RemoveStrand(sid2);
+    /*
+    The final strand has been removed. There should be no strands, sequences,
+    or half bindings.
+    */
+    EXPECT_EQ(0, db.m_bindables.GetSize());
+    EXPECT_EQ(0, db.m_seqs.GetSize());
+    EXPECT_EQ(0, db.m_half_bindings.GetSize());
+  }
+
 }
 
 

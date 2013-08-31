@@ -892,7 +892,7 @@ bool cFSMDB::Collide(int bbl_id_0, int bbl_id_1) {
   /* Brainstorming ... display bindables as strings. */
   Apto::String str_0(bbl_0->AsString(*this));
   Apto::String str_1(bbl_1->AsString(*this));
-  cout << "bbl_id_0:" << bbl_id_0 << ":str_0:" << str_0 << ", bbl_id_1:" << bbl_id_1 << ":str_1:" << str_1 << endl;
+  //cout << "bbl_id_0:" << bbl_id_0 << ":str_0:" << str_0 << ", bbl_id_1:" << bbl_id_1 << ":str_1:" << str_1 << endl;
   Apto::Map<int, Apto::Array<int> > &labels_0(bbl_0->GetLabels(*this)), &labels_1(bbl_1->GetLabels(*this));
   /*
   (Here we're just choosing the shorter of the two sequences in hopes that
@@ -1003,11 +1003,12 @@ bool cFSMDB::Collide(int bbl_id_0, int bbl_id_1) {
         if (bbl_b->m_bindpts.Has(rvc_chk) && (bbl_b->m_bindpts[rvc_chk].GetSize()>0)){ can_bind = false; }
       }
       /* Flip a loaded coin to see whether the binding would succeed. */
-      bool does_bind = (m_rng->GetDouble(0., 1.) < binding_probability);
+      bool does_bind = false;
+      if (can_bind) { does_bind = (m_rng->GetDouble(0., 1.) < binding_probability); }
       if (can_bind && does_bind) {
         /* If binding is possible and will succeed, bind! */
         /* Brainstorming ... display binding info. */
-        cout << "  binding: " << m_label_utils.ID2Seq(lbl_hb->m_lbl_id) << " (" << lbl_hb->m_lbl_pos << "), " << m_label_utils.ID2Seq(rvc_hb->m_lbl_id) << " (" << rvc_hb->m_lbl_pos << ")" << endl;
+        //cout << "  binding: " << m_label_utils.ID2Seq(lbl_hb->m_lbl_id) << " (" << lbl_hb->m_lbl_pos << "), " << m_label_utils.ID2Seq(rvc_hb->m_lbl_id) << " (" << rvc_hb->m_lbl_pos << ")" << endl;
         for (int j = 0; j < len; j++) {
           /* In each molecule, mark all bound positions. */
           int lbl_chk = lbl_hb->m_lbl_pos + j;
@@ -1015,7 +1016,7 @@ bool cFSMDB::Collide(int bbl_id_0, int bbl_id_1) {
           bbl_a->m_bindpts[lbl_chk].Insert(lbl_hb->ID());
           bbl_b->m_bindpts[rvc_chk].Insert(rvc_hb->ID());
           /* Brainstorming ... display binding info. */
-          cout << "    " << lbl_hb->m_lbl_pos + j << ":" << rvc_hb->m_lbl_pos + j << endl;
+          //cout << "    " << lbl_hb->m_lbl_pos + j << ":" << rvc_hb->m_lbl_pos + j << endl;
         }
         m_unbinding_scheduler.AdjustPriority(lbl_hb->ID(), len);
         m_unbinding_scheduler.AdjustPriority(rvc_hb->ID(), len);
@@ -1055,14 +1056,14 @@ bool cFSMDB::Unbind(int lbl_hb_id) {
   double unbinding_probability = pow(1. - point_binding_probability, lbl_hb->m_lbl_len);
   bool does_unbind = (m_rng->GetDouble(0., 1.) < unbinding_probability);
   if (does_unbind) {
-    cout << "unbinding: " << m_label_utils.ID2Seq(lbl_hb->m_lbl_id) << " (" << lbl_hb->m_lbl_pos << "), " << m_label_utils.ID2Seq(rvc_hb->m_lbl_id) << " (" << rvc_hb->m_lbl_pos << ")" << endl;
+    //cout << "unbinding: " << m_label_utils.ID2Seq(lbl_hb->m_lbl_id) << " (" << lbl_hb->m_lbl_pos << "), " << m_label_utils.ID2Seq(rvc_hb->m_lbl_id) << " (" << rvc_hb->m_lbl_pos << ")" << endl;
     int bbl_id_a = lbl_hb->m_parent_id;
     int bbl_id_b = rvc_hb->m_parent_id;
     cBindable* bbl_a = m_bindables.Get<cBindable>(bbl_id_a);
     cBindable* bbl_b = m_bindables.Get<cBindable>(bbl_id_b);
     Apto::String str_a(bbl_a->AsString(*this));
     Apto::String str_b(bbl_b->AsString(*this));
-    cout << "  bbl_id_a:" << bbl_id_a << ":str_a:" << str_a << ", bbl_id_b:" << bbl_id_b << ":str_b:" << str_b << endl;
+    //cout << "  bbl_id_a:" << bbl_id_a << ":str_a:" << str_a << ", bbl_id_b:" << bbl_id_b << ":str_b:" << str_b << endl;
     for (int j = 0; j < lbl_hb->m_lbl_len; j++) {
       /* In each molecule, mark all bound positions. */
       int lbl_chk = lbl_hb->m_lbl_pos + j;
@@ -1070,7 +1071,7 @@ bool cFSMDB::Unbind(int lbl_hb_id) {
       bbl_a->m_bindpts[lbl_chk].Remove(lbl_hb->ID());
       bbl_b->m_bindpts[rvc_chk].Remove(rvc_hb->ID());
       /* Brainstorming ... display binding info. */
-      cout << "  " << lbl_hb->m_lbl_pos + j << ":" << rvc_hb->m_lbl_pos + j << endl;
+      //cout << "  " << lbl_hb->m_lbl_pos + j << ":" << rvc_hb->m_lbl_pos + j << endl;
     }
     m_unbinding_scheduler.AdjustPriority(lbl_hb->ID(), 0.);
     m_unbinding_scheduler.AdjustPriority(rvc_hb->ID(), 0.);
@@ -1088,7 +1089,7 @@ bool cFSMDB::SingleRebinding() {
   cHalfBinding *rvc_hb = m_half_bindings.Get(rvc_hb_id);
   int bbl_id_a = lbl_hb->m_parent_id;
   int bbl_id_b = rvc_hb->m_parent_id;
-  cout << "rebinding: " << m_label_utils.ID2Seq(lbl_hb->m_lbl_id) << " (" << lbl_hb->m_lbl_pos << "), " << m_label_utils.ID2Seq(rvc_hb->m_lbl_id) << " (" << rvc_hb->m_lbl_pos << ")" << endl;
+  //cout << "rebinding: " << m_label_utils.ID2Seq(lbl_hb->m_lbl_id) << " (" << lbl_hb->m_lbl_pos << "), " << m_label_utils.ID2Seq(rvc_hb->m_lbl_id) << " (" << rvc_hb->m_lbl_pos << ")" << endl;
   Unbind(lbl_hb_id);
   Collide(bbl_id_a, bbl_id_b);
   return true;
