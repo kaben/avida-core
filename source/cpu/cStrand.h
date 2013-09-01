@@ -287,16 +287,37 @@ public:
 class cHalfBinding : public ObjBase {
 public:
   int m_parent_id;
-  int m_lbl_id;
-  int m_lbl_pos;
-  int m_lbl_len;
+  int m_pos;
+  int m_len;
   int m_other_half_binding_id;
-  void Set(int parent_id, int lbl_id, int lbl_pos, int lbl_len, int other_half_binding_id){
+  void Set(int parent_id, int pos, int len, int other_half_binding_id){
     m_parent_id = parent_id;
-    m_lbl_id = lbl_id;
-    m_lbl_pos = lbl_pos;
-    m_lbl_len = lbl_len;
+    m_pos = pos;
+    m_len = len;
     m_other_half_binding_id = other_half_binding_id;
+  }
+  void Print();
+};
+
+class cTmpHalfBinding {
+public:
+  int m_parent_id;
+  int m_pos;
+  int m_len;
+  cTmpHalfBinding *m_other_half_binding;
+public:
+  cTmpHalfBinding()
+  : m_parent_id(-1)
+  , m_pos(-1)
+  , m_len(-1)
+  , m_other_half_binding(0)
+  {}
+public:
+  void Set(int parent_id, int pos, int len, cTmpHalfBinding *other_half_binding){
+    m_parent_id = parent_id;
+    m_pos = pos;
+    m_len = len;
+    m_other_half_binding = other_half_binding;
   }
   void Print();
 };

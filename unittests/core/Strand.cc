@@ -35,6 +35,11 @@ using namespace std;
 
 
 /*
+BOOKMARK 20130831-2122
+- Decoupled binding from labels. Now I'd like to write and test the method:
+  
+  void cFSMDB::Bind(int fwd_id, int rvc_id, int fwd_pos, int rvc_pos, int len);
+
 BOOKMARK 20130830-2017
 - I think I need to decouple the ideas of labels and bindings. The reason is
   that I want to be able to bind state machines and strands at strand locations
