@@ -35,10 +35,34 @@ using namespace std;
 
 
 /*
+BOOKMARK 20130906-1222
+- Things I'd like state machines to be able to do:
+  - Replicate
+  - Input two binary numbers, and perform bitwise logic to produce a third number
+  - Navigate a maze / traverse a graph / Dijkstra
+
+BOOKMARK 20130901-2038
+- Trying to figure out how NFA read and write heads work. So far I know that:
+  - a read head must be bound to strand at some position on the strand;
+  - that the read head must advance as each symbol is read;
+  - that the read point needs to be some fixed distance to the binding point;
+  - that a write head must be bound to whatever strand it writes to;
+  - that the write head must advance as each symbol is written;
+  - that writing must be some fixed distance to the binding point;
+  - that writing can delete, insert, or replace symbols;
+  - that read and write heads can be bound the the same or to different
+    strands;
+  I want state machines to be able to bind to each other, so that one may have
+  the task of attaching another to a specific strand.
+
+  This argues that heads should correspond to specific binding points in the
+  state machine, but that there should be other binding points corresponding to
+  labels, for binding to other state machines.
+
 BOOKMARK 20130831-2122
 - Decoupled binding from labels. Now I'd like to write and test the method:
   
-  void cFSMDB::Bind(int fwd_id, int rvc_id, int fwd_pos, int rvc_pos, int len);
+  void cFSTSpace::Bind(int fwd_id, int rvc_id, int fwd_pos, int rvc_pos, int len);
 
 BOOKMARK 20130830-2017
 - I think I need to decouple the ideas of labels and bindings. The reason is
@@ -95,7 +119,7 @@ BOOKMARK 20130830-2017
     and these bindpoints may have various heads associated with them.
 
 BOOKMARK 20130828-2128
-- Currently working on cFSMDB::JoinStrands(). See info in BOOKMARK
+- Currently working on cFSTSpace::JoinStrands(). See info in BOOKMARK
   20130827-1913 regarding the joining operation.
 
 BOOKMARK 20130828-2115
@@ -319,7 +343,7 @@ BOOKMARK 20130827-1256
   we insert its new sequence, mark the new sequence's id as the parent id of
   the strand, and then delete the old sequence if it has no more references.
   This can be a single operation: ReplaceSequence(). This should probably be
-  done in the cFSMDB, so it will need the strand's ID and the new sequence as
+  done in the cFSTSpace, so it will need the strand's ID and the new sequence as
   arguments.
 BOOKMARK 20130825-2236
 - Working on test NFA.brainstorm. I've implemented a basic NFADef and NFA with
@@ -328,14 +352,14 @@ BOOKMARK 20130825-2236
   will work well for this purpose. Now I've got to figure out what the functors
   will do, what arguments they should take, and what they should return. I
   think they should take the ID of the current FSM as their sole argument, and
-  they should perhaps be functors bound to the cFSMDB object. They'll need to
+  they should perhaps be functors bound to the cFSTSpace object. They'll need to
   call the FSM polymorphically, if at all, which suggests I should consider
   adding to the basic FSM interface. But this can be deferred for now; I should
   spend my current effort sketching the system out. So next step would be to
   make a set of dumb functors.
 BOOKMARK 20130821-2238
-- Working on cFSMBootstrapDef, cFSMBootstrap, and int
-  cFSMDB::CreateFSMBootstrap(). This will become the FSM that bootstraps the
+- Working on cFSTBootstrapDef, cFSTBootstrap, and int
+  cFSTSpace::CreateFSMBootstrap(). This will become the FSM that bootstraps the
   CPU by reading the genome strand for specs to produce initial non-bootstrap
   FSMs. I imagine the bootstrap FSM could be deleted; but it will more probably
   remain in use. More than one can be created, even. Perhaps it is initially
@@ -344,7 +368,7 @@ BOOKMARK 20130821-1141
 - Need to be able to determine a bindable object's labels. Current bindables
   include strands and FSMs. Strands have sequences, which in turn have labels.
   FSMs have models, which in turn have labels.
-- I could make a virtual Map<int, Array<int> > &cBindable::GetLabelSites(cFSMDB
+- I could make a virtual Map<int, Array<int> > &cBindable::GetLabelSites(cFSTSpace
   &db) function that returns a bindable object's labels.
 BOOKMARK 20130819-2217
 - Possible solution to need for overlapping bindings implemented by changing
@@ -384,7 +408,7 @@ Next steps:
 */
 
 
-//class cFSMdb;
+//class cFSTdb;
 //
 //class cStrandLibrary;
 //class cStrand;
@@ -398,19 +422,19 @@ Next steps:
 //class bBindingSiteID;
 //class bBindingSitePosition;
 //
-//class cFSMLibrary;
-//class cFSM;
-//class cFSMProgramBase;
-//class cFSMProgramStrandCPU;
-//class cFSMProgramStrandBootstrap;
-//class cFSMProgramStrandEncoding;
+//class cFSTLibrary;
+//class cFST;
+//class cFSTProgramBase;
+//class cFSTProgramStrandCPU;
+//class cFSTProgramStrandBootstrap;
+//class cFSTProgramStrandEncoding;
 //
 //class cHit;
 //class bBindingLibrary;
 //class bBinding;
 //class bBindingCriteria;
 //
-//Apto::Array<cHit, Apto::Smart> bScanForLabels(int seq_id, cFSMdb &db);
+//Apto::Array<cHit, Apto::Smart> bScanForLabels(int seq_id, cFSTdb &db);
 //
 //class cSequence {
 //public:
@@ -435,7 +459,7 @@ Next steps:
 //class cLabel {
 //protected:
 //  Apto::Set<int> m_seq_ids;
-//  Apto::Set<int> m_fsm_def_ids;
+//  Apto::Set<int> m_fst_mdl_ids;
 //public:
 //  cLabel()
 //  {}
@@ -445,10 +469,10 @@ Next steps:
 //  int GetSeqCount() { return m_seq_ids.GetSize(); }
 //  bool RemoveSeq(int seq_id) { m_seq_ids.Remove(seq_id); }
 //
-//  void InsertFSMDef(int fsm_def_id) { m_fsm_def_ids.Insert(fsm_def_id); }
-//  bool HasFSMDef(int fsm_def_id) { return m_fsm_def_ids.Has(fsm_def_id); }
-//  bool GetFSMDefCount() { return m_fsm_def_ids.GetSize(); }
-//  bool RemoveFSMDef(int fsm_def_id) { m_fsm_def_ids.Remove(fsm_def_id); }
+//  void InsertFSMDef(int fst_mdl_id) { m_fst_mdl_ids.Insert(fst_mdl_id); }
+//  bool HasFSMDef(int fst_mdl_id) { return m_fst_mdl_ids.Has(fst_mdl_id); }
+//  bool GetFSMDefCount() { return m_fst_mdl_ids.GetSize(); }
+//  bool RemoveFSMDef(int fst_mdl_id) { m_fst_mdl_ids.Remove(fst_mdl_id); }
 //};
 //
 //class cLabelDeletemeIdx {
@@ -575,13 +599,13 @@ Next steps:
 
 
 /*
-cFSMdb owns all objects, and each object has an ID.
+cFSTdb owns all objects, and each object has an ID.
 
 */
 
 
 
-//class cFSMdb {
+//class cFSTdb {
 //public:
 //  bSeqIDIdx m_seq_idx;
 //  ObjDeleteMeIdx<cStrand> m_strand_idx;
@@ -620,9 +644,9 @@ cFSMdb owns all objects, and each object has an ID.
 //  bool RemoveLabel(int id);
 //};
 //
-//cStrand* cFSMdb::GetStrand(int id) { return m_strand_idx.Get(id); }
+//cStrand* cFSTdb::GetStrand(int id) { return m_strand_idx.Get(id); }
 //
-//int cFSMdb::InsertSequence(const Apto::String& seq) {
+//int cFSTdb::InsertSequence(const Apto::String& seq) {
 //  int seq_id = -1;
 //  if (m_seq_idx.Has(seq)) {
 //    /* Already known sequence; don't scan known sequences. */
@@ -638,11 +662,11 @@ cFSMdb owns all objects, and each object has an ID.
 //  return seq_id;
 //}
 //
-//bool cFSMdb::HasSequence(int id) { return m_seq_idx.Has(id); }
-//bool cFSMdb::HasSequence(Apto::SmartPtr<cSequence> ptr) { return m_seq_idx.Has(ptr); }
-//bool cFSMdb::HasSequence(const Apto::String &str) { return m_seq_idx.Has(str); }
+//bool cFSTdb::HasSequence(int id) { return m_seq_idx.Has(id); }
+//bool cFSTdb::HasSequence(Apto::SmartPtr<cSequence> ptr) { return m_seq_idx.Has(ptr); }
+//bool cFSTdb::HasSequence(const Apto::String &str) { return m_seq_idx.Has(str); }
 //
-//void cFSMdb::UnlinkSeqLblPos(int seq_id, int lbl_id, int lbl_pos) {
+//void cFSTdb::UnlinkSeqLblPos(int seq_id, int lbl_id, int lbl_pos) {
 //  Apto::SmartPtr<cSequence> seq_ptr = GetSequence(seq_id);
 //  if (seq_ptr) {
 //    seq_ptr->RemoveLabelPos(lbl_id, lbl_pos);
@@ -656,7 +680,7 @@ cFSMdb owns all objects, and each object has an ID.
 //    }
 //  }
 //}
-//void cFSMdb::UnlinkSeqLbl(int seq_id, int lbl_id) {
+//void cFSTdb::UnlinkSeqLbl(int seq_id, int lbl_id) {
 //  Apto::SmartPtr<cSequence> seq_ptr = GetSequence(seq_id);
 //  cLabel* lbl_ptr = GetLabel(lbl_id);
 //  if (seq_ptr && lbl_ptr) {
@@ -665,7 +689,7 @@ cFSMdb owns all objects, and each object has an ID.
 //    if (LabelRefCt(lbl_ptr) < 1) { RemoveLabel(lbl_ptr); }
 //  }
 //}
-//void cFSMdb::UnlinkSeqLbls(int seq_id) {
+//void cFSTdb::UnlinkSeqLbls(int seq_id) {
 //  Apto::SmartPtr<cSequence> seq_ptr = GetSequence(seq_id);
 //  if (seq_ptr) {
 //    for (cSequence::LabelIter it = seq_ptr->Labels(); it.Next();) {
@@ -682,59 +706,59 @@ cFSMdb owns all objects, and each object has an ID.
 //  }
 //}
 //
-//Apto::String cFSMdb::GetSequenceString(int id) { return m_seq_idx.GetString(id); }
-//Apto::SmartPtr<cSequence> cFSMdb::GetSequence(int id) { return m_seq_idx.Get(id); }
-//int cFSMdb::GetSequenceID(cSequence *ptr) { return m_seq_idx.GetID(ptr); }
-//int cFSMdb::GetSequenceID(const Apto::String &str) { return m_seq_idx.GetID(str); }
-//bool cFSMdb::RemoveSequence(const Apto::String& str) {
+//Apto::String cFSTdb::GetSequenceString(int id) { return m_seq_idx.GetString(id); }
+//Apto::SmartPtr<cSequence> cFSTdb::GetSequence(int id) { return m_seq_idx.Get(id); }
+//int cFSTdb::GetSequenceID(cSequence *ptr) { return m_seq_idx.GetID(ptr); }
+//int cFSTdb::GetSequenceID(const Apto::String &str) { return m_seq_idx.GetID(str); }
+//bool cFSTdb::RemoveSequence(const Apto::String& str) {
 //  RemoveSequence(GetSequenceID(str));
 //}
-//bool cFSMdb::RemoveSequence(Apto::SmartPtr<cSequence> ptr) {
+//bool cFSTdb::RemoveSequence(Apto::SmartPtr<cSequence> ptr) {
 //  RemoveSequence(GetSequenceID(ptr));
 //}
-//bool cFSMdb::RemoveSequence(int id) {
+//bool cFSTdb::RemoveSequence(int id) {
 //  UnlinkSeqLbls(id);
 //  m_seq_idx.Delete(id);
 //}
 //
-//cLabel* cFSMdb::InsertLabel(int id) { return m_label_idx.Insert(id); }
-//bool cFSMdb::HasLabel(cLabel* ptr) { return m_label_idx.Has(ptr); }
-//bool cFSMdb::HasLabel(int id) { return m_label_idx.Has(id); }
-//cLabel* cFSMdb::GetLabel(int id) { return m_label_idx.Get(id); }
-//int cFSMdb::GetLabelID(cLabel* ptr) { return m_label_idx.GetID(ptr); }
-//int cFSMdb::LabelRefCt(cLabel* ptr) {
+//cLabel* cFSTdb::InsertLabel(int id) { return m_label_idx.Insert(id); }
+//bool cFSTdb::HasLabel(cLabel* ptr) { return m_label_idx.Has(ptr); }
+//bool cFSTdb::HasLabel(int id) { return m_label_idx.Has(id); }
+//cLabel* cFSTdb::GetLabel(int id) { return m_label_idx.Get(id); }
+//int cFSTdb::GetLabelID(cLabel* ptr) { return m_label_idx.GetID(ptr); }
+//int cFSTdb::LabelRefCt(cLabel* ptr) {
 //  if (m_label_idx.Has(ptr)) { return ptr->GetSeqCount(); }
 //  return -1;
 //}
-//int cFSMdb::LabelRefCt(int id) {
+//int cFSTdb::LabelRefCt(int id) {
 //  if (m_label_idx.Has(id)) { return m_label_idx.Get(id)->GetSeqCount(); }
 //  return -1;
 //}
-//bool cFSMdb::RemoveLabel(cLabel* ptr) { return m_label_idx.Delete(ptr); }
-//bool cFSMdb::RemoveLabel(int id) { return m_label_idx.Delete(id); }
+//bool cFSTdb::RemoveLabel(cLabel* ptr) { return m_label_idx.Delete(ptr); }
+//bool cFSTdb::RemoveLabel(int id) { return m_label_idx.Delete(id); }
 
 
 //class bBindingSitePosition {
 //public:
 //};
 //
-//class cFSM {
+//class cFST {
 //public:
 //};
 //
-//class cFSMProgramBase {
+//class cFSTProgramBase {
 //public:
 //};
 //
-//class cFSMProgramStrandCPU {
+//class cFSTProgramStrandCPU {
 //public:
 //};
 //
-//class cFSMProgramStrandBootstrap {
+//class cFSTProgramStrandBootstrap {
 //public:
 //};
 //
-//class cFSMProgramStrandEncoding {
+//class cFSTProgramStrandEncoding {
 //public:
 //};
 //
@@ -917,32 +941,32 @@ namespace cLabelIdxTests {
 
 namespace nFSMDBTests {
 
-  class cFSMDBTestFixture : public cFSMDB {
+  class cFSTSpaceTestFixture : public cFSTSpace {
   public:
-    int InsertSequence(const Apto::String &sequence) { return cFSMDB::InsertSequence(sequence); }
-    void UnlinkSeqLbls(int seq_id) { cFSMDB::UnlinkSeqLbls(seq_id); }
-    bool RemoveSequence(int seq_id) { return cFSMDB::RemoveSequence(seq_id); }
-    cFSMDBTestFixture(int rng_seed = -1)
-    : cFSMDB(rng_seed)
+    int InsertSequence(const Apto::String &sequence) { return cFSTSpace::InsertSequence(sequence); }
+    void UnlinkSeqLbls(int seq_id) { cFSTSpace::UnlinkSeqLbls(seq_id); }
+    bool RemoveSequence(int seq_id) { return cFSTSpace::RemoveSequence(seq_id); }
+    cFSTSpaceTestFixture(int rng_seed = -1)
+    : cFSTSpace(rng_seed)
     {}
   };
 
 
-  TEST(cFSMDB, instantiation){
-    cFSMDBTestFixture db;
+  TEST(cFSTSpace, instantiation){
+    cFSTSpaceTestFixture db;
     /* Simple check to make sure instantiation works. */
     /* Call methods to ensure instantiation of template class. */
     /* Indices should initially be empty, so have zero size! */
     EXPECT_EQ(0, db.m_lbls.GetSize());
     EXPECT_EQ(0, db.m_seqs.GetSize());
-    EXPECT_EQ(0, db.m_fsm_defs.GetSize());
+    EXPECT_EQ(0, db.m_fst_mdls.GetSize());
     EXPECT_EQ(0, db.m_half_bindings.GetSize());
     EXPECT_EQ(0, db.m_bindables.GetSize());
   }
 
 
-//  TEST(cFSMdb, brainstorm){
-//    cFSMDBTestFixture db;
+//  TEST(cFSTdb, brainstorm){
+//    cFSTSpaceTestFixture db;
 //    int seq_id = db.m_seq_idx.Insert("abcdxyzabcdxyzabcd");
 //    /*
 //    Scenario:
@@ -970,8 +994,8 @@ namespace nFSMDBTests {
 //  }
 
 
-//  TEST(cFSMdb, sequence_accessors){
-//    cFSMDBTestFixture db;
+//  TEST(cFSTdb, sequence_accessors){
+//    cFSTSpaceTestFixture db;
 //    Apto::String seq("abcdxyzabcdxyzabcd");
 //  
 //    //EXPECT_FALSE(db.HasSequence(-1));
@@ -1012,8 +1036,8 @@ namespace nFSMDBTests {
 //  }
 
 
-//  TEST(cFSMdb, label_accessors){
-//    cFSMDBTestFixture db;
+//  TEST(cFSTdb, label_accessors){
+//    cFSTSpaceTestFixture db;
 //  
 //    EXPECT_FALSE(db.HasLabel(5));
 //    EXPECT_FALSE(db.HasLabel((cLabel*)0));
@@ -1090,7 +1114,7 @@ namespace nFSMDBTests {
 
 
 //  TEST(cLabel, label_ref_ct) {
-//    cFSMDBTestFixture db;
+//    cFSTSpaceTestFixture db;
 //    cLabel* lbl_ptr = db.InsertLabel(300);
 //    EXPECT_EQ(0, lbl_ptr->GetSeqCount());
 //    lbl_ptr->InsertSeq(0);
@@ -1110,12 +1134,12 @@ namespace nFSMDBTests {
 //  }
 
 
-//  TEST(cFSMdb, sequence_is_referenced){
+//  TEST(cFSTdb, sequence_is_referenced){
 //  }
 
 
-  TEST(cFSMDB, brainstorm_0){
-    cFSMDBTestFixture db;
+  TEST(cFSTSpace, brainstorm_0){
+    cFSTSpaceTestFixture db;
     /* Create first seq. */
     Apto::String seq_0("abcdxyzabcdxyzabcd");
     ///* Sanity: this should be an unseen sequence. */
@@ -1271,7 +1295,7 @@ namespace nFSMDBTests {
       - And subsequently from sequences to strands
       - Why? Because the process of binding a strand locates strands via labels.
     - Given label ID, list of matching FSM models and positions
-      // Array<cFSMHit> *hits = db.getFSMHits(lbl_id)
+      // Array<cFSTHit> *hits = db.getFSMHits(lbl_id)
       - And subsequently from FSM models to FSMs
       - Why? Because the process of binding an FSM locates n FSMs via labels.
     - Given a sequence, list of matching labels.
@@ -1331,8 +1355,8 @@ namespace nFSMDBTests {
   }
 
 
-  TEST(cFSMDB, brainstorm_1) {
-    cFSMDBTestFixture db;
+  TEST(cFSTSpace, brainstorm_1) {
+    cFSTSpaceTestFixture db;
     /*
     This is a debruijn sequence containing:
     - one each of all triplet labels with 'a', 'b', 'c', or 'd';
@@ -1356,8 +1380,8 @@ namespace nFSMDBTests {
   }
 
 
-  TEST(cFSMDB, brainstorm_2) {
-    cFSMDBTestFixture db;
+  TEST(cFSTSpace, brainstorm_2) {
+    cFSTSpaceTestFixture db;
     /*
     This is a debruijn sequence containing:
     - one each of all triplet labels with 'a', 'b', 'c', or 'd';
@@ -1391,8 +1415,8 @@ namespace nFSMDBTests {
     EXPECT_EQ(0, db.m_lbls.GetSize());
   }
 
-  TEST(cFSMDB, AssociateSeqToStrand){
-    cFSMDBTestFixture db;
+  TEST(cFSTSpace, AssociateSeqToStrand){
+    cFSTSpaceTestFixture db;
     /*
     This is a debruijn sequence containing:
     - one each of all triplet labels with 'a', 'b', 'c', or 'd';
@@ -1433,9 +1457,9 @@ namespace nFSMDBTests {
     EXPECT_EQ(0, db.m_bindables.GetSize());
   }
 
-  TEST(cFSMDB, RemoveSubstrand){
+  TEST(cFSTSpace, RemoveSubstrand){
     int rng_seed = 0;
-    cFSMDBTestFixture db(rng_seed);
+    cFSTSpaceTestFixture db(rng_seed);
     db.m_label_utils.m_max_label_size = 6;
     int strand_id_0 = db.CreateStrand();
     int strand_id_1 = db.CreateStrand();
@@ -1499,9 +1523,9 @@ namespace nFSMDBTests {
     EXPECT_EQ(0, db.m_half_bindings.GetSize());
   }
 
-  TEST(cFSMDB, RemoveSubstrand_before_start){
+  TEST(cFSTSpace, RemoveSubstrand_before_start){
     int rng_seed = 0;
-    cFSMDBTestFixture db(rng_seed);
+    cFSTSpaceTestFixture db(rng_seed);
     db.m_label_utils.m_max_label_size = 6;
     int strand_id_0 = db.CreateStrand();
     db.AssociateSeqToStrand(strand_id_0, "aaaaaagbbb");
@@ -1515,9 +1539,9 @@ namespace nFSMDBTests {
     db.RemoveStrand(strand_id_0);
   }
 
-  TEST(cFSMDB, RemoveSubstrand_after_end){
+  TEST(cFSTSpace, RemoveSubstrand_after_end){
     int rng_seed = 0;
-    cFSMDBTestFixture db(rng_seed);
+    cFSTSpaceTestFixture db(rng_seed);
     db.m_label_utils.m_max_label_size = 6;
     int strand_id_0 = db.CreateStrand();
     db.AssociateSeqToStrand(strand_id_0, "aaaaaagbbb");
@@ -1531,9 +1555,9 @@ namespace nFSMDBTests {
     db.RemoveStrand(strand_id_0);
   }
 
-  TEST(cFSMDB, RemoveSubstrand_including_start){
+  TEST(cFSTSpace, RemoveSubstrand_including_start){
     int rng_seed = 0;
-    cFSMDBTestFixture db(rng_seed);
+    cFSTSpaceTestFixture db(rng_seed);
     db.m_label_utils.m_max_label_size = 6;
     int strand_id_0 = db.CreateStrand();
     db.AssociateSeqToStrand(strand_id_0, "abcdef");
@@ -1544,9 +1568,9 @@ namespace nFSMDBTests {
     db.RemoveStrand(d1);
   }
 
-  TEST(cFSMDB, RemoveSubstrand_including_end){
+  TEST(cFSTSpace, RemoveSubstrand_including_end){
     int rng_seed = 0;
-    cFSMDBTestFixture db(rng_seed);
+    cFSTSpaceTestFixture db(rng_seed);
     db.m_label_utils.m_max_label_size = 6;
     int strand_id_0 = db.CreateStrand();
     db.AssociateSeqToStrand(strand_id_0, "abcdef");
@@ -1557,9 +1581,9 @@ namespace nFSMDBTests {
     db.RemoveStrand(d0);
   }
 
-  TEST(cFSMDB, SplitStrand){
+  TEST(cFSTSpace, SplitStrand){
     int rng_seed = 0;
-    cFSMDBTestFixture db(rng_seed);
+    cFSTSpaceTestFixture db(rng_seed);
     db.m_label_utils.m_max_label_size = 6;
     int strand_id_0 = db.CreateStrand();
     int strand_id_1 = db.CreateStrand();
@@ -1623,9 +1647,9 @@ namespace nFSMDBTests {
     EXPECT_EQ(0, db.m_half_bindings.GetSize());
   }
 
-  TEST(cFSMDB, SplitStrand_before_start){
+  TEST(cFSTSpace, SplitStrand_before_start){
     int rng_seed = 0;
-    cFSMDBTestFixture db(rng_seed);
+    cFSTSpaceTestFixture db(rng_seed);
     db.m_label_utils.m_max_label_size = 6;
     int strand_id_0 = db.CreateStrand();
     db.AssociateSeqToStrand(strand_id_0, "aaaaaagbbb");
@@ -1639,9 +1663,9 @@ namespace nFSMDBTests {
     db.RemoveStrand(strand_id_0);
   }
 
-  TEST(cFSMDB, SplitStrand_after_end){
+  TEST(cFSTSpace, SplitStrand_after_end){
     int rng_seed = 0;
-    cFSMDBTestFixture db(rng_seed);
+    cFSTSpaceTestFixture db(rng_seed);
     db.m_label_utils.m_max_label_size = 6;
     int strand_id_0 = db.CreateStrand();
     db.AssociateSeqToStrand(strand_id_0, "aaaaaagbbb");
@@ -1655,9 +1679,9 @@ namespace nFSMDBTests {
     db.RemoveStrand(strand_id_0);
   }
 
-  TEST(cFSMDB, JoinStrands){
+  TEST(cFSTSpace, JoinStrands){
     int rng_seed = 0;
-    cFSMDBTestFixture db(rng_seed);
+    cFSTSpaceTestFixture db(rng_seed);
     db.m_label_utils.m_max_label_size = 6;
     int sid0 = db.CreateStrand(), sid1 = db.CreateStrand(), sid2 = db.CreateStrand();
     db.AssociateSeqToStrand(sid0, "aaaaaagbbbbbb");
@@ -1707,8 +1731,8 @@ namespace nFSMDBTests {
     EXPECT_EQ(0, db.m_half_bindings.GetSize());
   }
 
-  TEST(cFSMDB, InsertSubstrand_middle){
-    cFSMDBTestFixture db;
+  TEST(cFSTSpace, InsertSubstrand_middle){
+    cFSTSpaceTestFixture db;
     int sid0 = db.CreateStrand(), sid1 = db.CreateStrand();
     db.AssociateSeqToStrand(sid0, "abcdef");
     db.AssociateSeqToStrand(sid1, "xxx");
@@ -1722,8 +1746,8 @@ namespace nFSMDBTests {
     EXPECT_EQ(0, db.m_seqs.GetSize());
   }
 
-  TEST(cFSMDB, InsertSubstrand_start){
-    cFSMDBTestFixture db;
+  TEST(cFSTSpace, InsertSubstrand_start){
+    cFSTSpaceTestFixture db;
     int sid0 = db.CreateStrand(), sid1 = db.CreateStrand();
     db.AssociateSeqToStrand(sid0, "abcdef");
     db.AssociateSeqToStrand(sid1, "xxx");
@@ -1737,8 +1761,8 @@ namespace nFSMDBTests {
     EXPECT_EQ(0, db.m_seqs.GetSize());
   }
 
-  TEST(cFSMDB, InsertSubstrand_end){
-    cFSMDBTestFixture db;
+  TEST(cFSTSpace, InsertSubstrand_end){
+    cFSTSpaceTestFixture db;
     int sid0 = db.CreateStrand(), sid1 = db.CreateStrand();
     db.AssociateSeqToStrand(sid0, "abcdef");
     db.AssociateSeqToStrand(sid1, "xxx");
@@ -1752,8 +1776,8 @@ namespace nFSMDBTests {
     EXPECT_EQ(0, db.m_seqs.GetSize());
   }
 
-  TEST(cFSMDB, AlterSubstrand_middle){
-    cFSMDBTestFixture db;
+  TEST(cFSTSpace, AlterSubstrand_middle){
+    cFSTSpaceTestFixture db;
     int sid0 = db.CreateStrand(), sid1 = db.CreateStrand();
     db.AssociateSeqToStrand(sid0, "abcdef");
     db.AssociateSeqToStrand(sid1, "xxx");
@@ -1767,8 +1791,8 @@ namespace nFSMDBTests {
     EXPECT_EQ(0, db.m_seqs.GetSize());
   }
 
-  TEST(cFSMDB, AlterSubstrand_start){
-    cFSMDBTestFixture db;
+  TEST(cFSTSpace, AlterSubstrand_start){
+    cFSTSpaceTestFixture db;
     int sid0 = db.CreateStrand(), sid1 = db.CreateStrand();
     db.AssociateSeqToStrand(sid0, "abcdef");
     db.AssociateSeqToStrand(sid1, "xxx");
@@ -1782,8 +1806,8 @@ namespace nFSMDBTests {
     EXPECT_EQ(0, db.m_seqs.GetSize());
   }
 
-  TEST(cFSMDB, AlterSubstrand_end){
-    cFSMDBTestFixture db;
+  TEST(cFSTSpace, AlterSubstrand_end){
+    cFSTSpaceTestFixture db;
     int sid0 = db.CreateStrand(), sid1 = db.CreateStrand();
     db.AssociateSeqToStrand(sid0, "abcdef");
     db.AssociateSeqToStrand(sid1, "xxx");
@@ -1797,9 +1821,9 @@ namespace nFSMDBTests {
     EXPECT_EQ(0, db.m_seqs.GetSize());
   }
 
-  TEST(cFSMDB, InsertSubstrand){
+  TEST(cFSTSpace, InsertSubstrand){
     int rng_seed = 0;
-    cFSMDBTestFixture db(rng_seed);
+    cFSTSpaceTestFixture db(rng_seed);
     db.m_label_utils.m_max_label_size = 6;
     int sid0 = db.CreateStrand(), sid1 = db.CreateStrand(), sid2 = db.CreateStrand();
     db.AssociateSeqToStrand(sid0, "aaaaaagnopqrstuvwxcccccc");
@@ -1849,9 +1873,9 @@ namespace nFSMDBTests {
     EXPECT_EQ(0, db.m_half_bindings.GetSize());
   }
 
-  TEST(cFSMDB, AlterSubstrand_0){
+  TEST(cFSTSpace, AlterSubstrand_0){
     int rng_seed = 0;
-    cFSMDBTestFixture db(rng_seed);
+    cFSTSpaceTestFixture db(rng_seed);
     db.m_label_utils.m_max_label_size = 6;
     int sid0 = db.CreateStrand(), sid1 = db.CreateStrand(), sid2 = db.CreateStrand();
     db.AssociateSeqToStrand(sid0, "aaaaaagbbbbbbnopqrstuvwxcccccc");
@@ -1902,9 +1926,9 @@ namespace nFSMDBTests {
     EXPECT_EQ(0, db.m_half_bindings.GetSize());
   }
 
-  TEST(cFSMDB, AlterSubstrand_1){
+  TEST(cFSTSpace, AlterSubstrand_1){
     int rng_seed = 0;
-    cFSMDBTestFixture db(rng_seed);
+    cFSTSpaceTestFixture db(rng_seed);
     db.m_label_utils.m_max_label_size = 6;
     int sid0 = db.CreateStrand(), sid1 = db.CreateStrand(), sid2 = db.CreateStrand();
     db.AssociateSeqToStrand(sid0, "aaaaaagxxxnopqrstuvwxcccccc");
@@ -2694,7 +2718,7 @@ namespace nObjIdxTests {
 TEST(Kinetics, collisions_and_unbinding_brainstorm) {
   /* Seed random number generator. */
   std::srand(0);
-  cFSMDB db;
+  cFSTSpace db;
   db.m_label_utils.m_max_label_size = 6;
   /* debruijn sequence with all triplets of a-d. */
   Apto::String seq_0("aaabaacaadabbabcabdacbaccacdadbadcaddbbbcbbdbccbcdbdcbddcccdcdddaaccacac");
@@ -2717,14 +2741,23 @@ TEST(Kinetics, collisions_and_unbinding_brainstorm) {
   }
 }
 
+TEST(IOxd, brainstorm) {
+  /* Input-output transducer tests. */
+}
+
 TEST(NFA, brainstorm) {
-  cFSMDB db;
+  cFSTSpace db;
   /*
   For now, hardwire an NFADef, then instantiate an NFA using the def, then test
   the NFA. Later, brainstorm and test various encodings.
   */
   /* Instantiate NFADef. */
-  cNFADef *nfa_def = db.m_fsm_defs.Create<cNFADef>();
+  cNFADef *nfa_def = db.m_fst_mdls.Create<cNFADef>();
+  /* Read/Write head binding positions. */
+  nfa_def->m_rhead_pos = 0;
+  nfa_def->m_rhead_ofs = -1;
+  nfa_def->m_whead_pos = 6;
+  nfa_def->m_whead_ofs = -1;
   /* Hardwire transitions. */
   nfa_def->m_transition_relation[0]['a'].Push(1);
   nfa_def->m_transition_relation[0]['b'].Push(2);
@@ -2753,28 +2786,95 @@ TEST(NFA, brainstorm) {
   /* Instantiate NFA using the NFADef. */
   cNFA *nfa = db.m_bindables.Create<cNFA>();
   nfa->m_rng = db.m_rng;
-  nfa->m_fsm_def_id = nfa_def->ID();
+  nfa->m_fst_mdl_id = nfa_def->ID();
   nfa->m_state_id = 0;
+
   /* Test the NFA. */
-  cout << "Transition('a'): " << nfa->Transition('a', db) << endl;
-  cout << "Transition('b'): " << nfa->Transition('b', db) << endl;
-  cout << "Transition('c'): " << nfa->Transition('c', db) << endl;
-  cout << "Transition('b'): " << nfa->Transition('b', db) << endl;
-  cout << "Transition('c'): " << nfa->Transition('c', db) << endl;
-  cout << "Transition('d'): " << nfa->Transition('d', db) << endl;
-  cout << "Transition('a'): " << nfa->Transition('a', db) << endl;
-  cout << "Transition('b'): " << nfa->Transition('b', db) << endl;
-  cout << "Transition('a'): " << nfa->Transition('a', db) << endl;
-  cout << "Transition('b'): " << nfa->Transition('b', db) << endl;
-  cout << "Transition('a'): " << nfa->Transition('a', db) << endl;
-  cout << "Transition('b'): " << nfa->Transition('b', db) << endl;
-  cout << "Transition('a'): " << nfa->Transition('a', db) << endl;
+  int sid0 = db.CreateStrand();
+  /*
+  012345
+  XXXXXXabcbcdabababa
+        r
+       R
+  543210
+
+   123456
+  XXXXXXabcbcdabababa
+         r
+        R
+   543210
+
+  .
+  .
+  .
+
+              111111
+              234567
+  XXXXXXabcbcdabababa
+                    r
+                   R
+              543210
+
+               111111
+               345678
+  XXXXXXabcbcdabababa
+                     r
+                    R
+               543210
+
+  */
+  db.AssociateSeqToStrand(sid0, "XXXXXXabcbcdabababa");
+  db.Bind(sid0, nfa->ID(), 0, 0, 6);
+
+  //cout << "Transition('a'): " << nfa->Transition('a', db) << endl;
+  //cout << "Transition('b'): " << nfa->Transition('b', db) << endl;
+  //cout << "Transition('c'): " << nfa->Transition('c', db) << endl;
+  //cout << "Transition('b'): " << nfa->Transition('b', db) << endl;
+  //cout << "Transition('c'): " << nfa->Transition('c', db) << endl;
+  //cout << "Transition('d'): " << nfa->Transition('d', db) << endl;
+  //cout << "Transition('a'): " << nfa->Transition('a', db) << endl;
+  //cout << "Transition('b'): " << nfa->Transition('b', db) << endl;
+  //cout << "Transition('a'): " << nfa->Transition('a', db) << endl;
+  //cout << "Transition('b'): " << nfa->Transition('b', db) << endl;
+  //cout << "Transition('a'): " << nfa->Transition('a', db) << endl;
+  //cout << "Transition('b'): " << nfa->Transition('b', db) << endl;
+  //cout << "Transition('a'): " << nfa->Transition('a', db) << endl;
+
+  cout << "Transition('a'): " << nfa->Transition(db) << endl;
+  cout << "Transition('b'): " << nfa->Transition(db) << endl;
+  cout << "Transition('c'): " << nfa->Transition(db) << endl;
+  cout << "Transition('b'): " << nfa->Transition(db) << endl;
+  cout << "Transition('c'): " << nfa->Transition(db) << endl;
+  cout << "Transition('d'): " << nfa->Transition(db) << endl;
+  cout << "Transition('a'): " << nfa->Transition(db) << endl;
+  cout << "Transition('b'): " << nfa->Transition(db) << endl;
+  cout << "Transition('a'): " << nfa->Transition(db) << endl;
+  cout << "Transition('b'): " << nfa->Transition(db) << endl;
+  cout << "Transition('a'): " << nfa->Transition(db) << endl;
+  cout << "Transition('b'): " << nfa->Transition(db) << endl;
+  cout << "Transition('a'): " << nfa->Transition(db) << endl;
+  cout << "Transition(-1): " << nfa->Transition(db) << endl;
+
+  //nfa->Step(db);
+  //nfa->Step(db);
+  //nfa->Step(db);
+  //nfa->Step(db);
+  //nfa->Step(db);
+  //nfa->Step(db);
+  //nfa->Step(db);
+  //nfa->Step(db);
+  //nfa->Step(db);
+  //nfa->Step(db);
+  //nfa->Step(db);
+  //nfa->Step(db);
+  //nfa->Step(db);
+
   /* Figure out how function calls will work. */
   /* Now hardwire some functions. */
   /* Test in the NFA. */
   /* Brainstorm some encodings. Test each. */
   /* Cleanup. */
-  db.m_fsm_defs.Delete(nfa_def->ID());
+  db.m_fst_mdls.Delete(nfa_def->ID());
 }
 
 
@@ -2849,7 +2949,7 @@ TEST(NFA, brainstorm) {
 //
 //}
 
-//int cFSMDB::InsertSequence(const Apto::String &sequence) {
+//int cFSTSpace::InsertSequence(const Apto::String &sequence) {
   //if (m_seqs.Has(seq)) { return m_seqs.Insert(seq); }
 
   ///* Scan new sequence for labels. */

@@ -425,10 +425,10 @@ int cBasicLabelUtils::ReverseComplement(const int id, const int rot) const {
 }
 
 void cHalfBinding::Print() {
-  cout << "cHalfBinding::Print(): ID: " << ID() << ", m_parent_id: " << m_parent_id << ", m_pos: " << m_pos << ", m_len: " << m_len << ", m_other_half_binding_id: " << m_other_half_binding_id << endl;
+  cout << "cHalfBinding::Print(): ID: " << ID() << ", m_parent_id: " << m_parent_id << ", m_pos: " << m_pos << ", m_len: " << m_len << ", m_other_hb_id: " << m_other_hb_id << endl;
 }
 
-Apto::Array<int> cBindable::GetBindings(cFSMDB &db) {
+Apto::Array<int> cBindable::GetBindings(cFSTSpace &db) {
   Apto::Set<int> half_binding_set;
   for (Apto::Map<int, Apto::Set<int> >::KeyIterator kit = m_bindpts.Keys(); kit.Next();) {
     for (Apto::Set<int>::Iterator it = m_bindpts[*kit.Get()].Begin(); it.Next();) {
@@ -442,24 +442,29 @@ Apto::Array<int> cBindable::GetBindings(cFSMDB &db) {
   return half_binding_ary;
 }
 
-Apto::Map<int, Apto::Array<int> > &cStrand::GetLabels(cFSMDB &db) {
+Apto::Map<int, Apto::Array<int> > &cStrand::GetLabels(cFSTSpace &db) {
   return db.m_seqs.Get(m_seq_id)->m_labels;
 }
-Apto::String cStrand::AsString(cFSMDB &db) {
+Apto::String cStrand::AsString(cFSTSpace &db) {
   return db.m_seqs.GetString(m_seq_id);
 }
-
-
-Apto::Map<int, Apto::Array<int> > &cFSM::GetLabels(cFSMDB &db) {
-  return db.m_fsm_defs.Get(m_fsm_def_id)->m_labels;
+bool cStrand::IsBindable(int pos, int len, cFSTSpace &db) {
+  int size = AsString(db).GetSize();
+  if ((0 <= pos) && (pos + len <= size)) { return true; }
+  return false;
 }
-Apto::String cFSM::AsString(cFSMDB &db) {
+
+
+Apto::Map<int, Apto::Array<int> > &cFST::GetLabels(cFSTSpace &db) {
+  return db.m_fst_mdls.Get(m_fst_mdl_id)->m_labels;
+}
+Apto::String cFST::AsString(cFSTSpace &db) {
   return "";
 }
 
-int cNFA::Transition(int symbol_id, cFSMDB &db) {
-  cNFADef *nfa_def = db.m_fsm_defs.Get<cNFADef>(m_fsm_def_id);
-  cout << "symbol_id: " << symbol_id << ", current m_state_id: " << m_state_id;
+int cNFA::Transition(int symbol_id, cFSTSpace &db) {
+  cNFADef *nfa_def = db.m_fst_mdls.Get<cNFADef>(m_fst_mdl_id);
+  cout << "symbol_id: " << symbol_id << "(" << ((char)symbol_id) << "), current m_state_id: " << m_state_id;
   if (nfa_def != NULL) {
     if (nfa_def->m_transition_relation.Has(m_state_id) && nfa_def->m_transition_relation[m_state_id].Has(symbol_id)) {
       int num_states = nfa_def->m_transition_relation[m_state_id][symbol_id].GetSize();
@@ -492,6 +497,39 @@ int cNFA::Transition(int symbol_id, cFSMDB &db) {
   cout << ", next m_state_id: " << m_state_id << endl;
   return m_state_id;
 }
+int cNFA::Read(cFSTSpace &db, int move) {
+  cNFADef *nfa_def = db.m_fst_mdls.Get<cNFADef>(m_fst_mdl_id);
+  int rhead_pos = nfa_def->m_rhead_pos;
+  int rhead_ofs = nfa_def->m_rhead_ofs;
+  if (!m_bindpts.Has(rhead_pos)) { return -1; }
+  /*
+  Look for a strand or state machine bound to NFA at the same position as
+  read head.
+  */
+  /* FIXME: For now we assume only a single bindable is bound. */
+  int hb_id = AsArray(m_bindpts[rhead_pos])[0];
+  cHalfBinding *hb = db.m_half_bindings.Get(hb_id);
+  int other_hb_id = hb->m_other_hb_id;
+  cHalfBinding *other_hb = db.m_half_bindings.Get(other_hb_id);
+  int bbl_id = other_hb->m_parent_id;
+  cBindable *bbl = db.m_bindables.Get(bbl_id);
+  int bbl_bindpt = other_hb->m_pos;
+  int bbl_bindlen = other_hb->m_len;
+  int symbol_pos = bbl_bindpt + (bbl_bindlen - 1) - rhead_ofs;
+  int bbl_len = bbl->AsString(db).GetSize();
+  int symbol = -1;
+  /* Make sure we're reading from within bindable. */
+  if (symbol_pos < bbl_len) { symbol = bbl->AsString(db)[symbol_pos]; }
+  hb->m_pos += move;
+  if (bbl->AsString(db).GetSize() <= hb->m_pos) { db.Unbind(hb_id); }
+  return symbol;
+}
+int cNFA::Transition(cFSTSpace &db) {
+  /* Don't transition unless symbol is valid. */
+  int symbol = Read(db, 1);
+  if (0 <= symbol) { return Transition(symbol, db); }
+}
+
 
 bool cLabelIdx::Has(int id) { return m_id2idx.Has(id); }
 cLabel* cLabelIdx::Get(int id) { return (Has(id))?(m_objs[m_id2idx[id]]):((cLabel*)(0)); }
@@ -560,42 +598,42 @@ bool cSeqIdx::Delete(int id) {
 bool cSeqIdx::Delete(const Apto::String &str) { return Delete(GetID(str)); }
 
 
-cFSMFunctorObject::cFSMFunctorObject(cFSMDB &db)
+cFSTFunctorObject::cFSTFunctorObject(cFSTSpace &db)
 : m_db(db)
 {}
-void cFSMFunctorObject::Function0(int caller_id){
-  cout << "cFSMFunctorObject::Function0(" << caller_id << ")" << endl;
+void cFSTFunctorObject::Function0(int caller_id){
+  cout << "cFSTFunctorObject::Function0(" << caller_id << ")" << endl;
 }
-void cFSMFunctorObject::Function1(int caller_id){
-  cout << "cFSMFunctorObject::Function1(" << caller_id << ")" << endl;
+void cFSTFunctorObject::Function1(int caller_id){
+  cout << "cFSTFunctorObject::Function1(" << caller_id << ")" << endl;
 }
-void cFSMFunctorObject::Function2(int caller_id){
-  cout << "cFSMFunctorObject::Function2(" << caller_id << ")" << endl;
+void cFSTFunctorObject::Function2(int caller_id){
+  cout << "cFSTFunctorObject::Function2(" << caller_id << ")" << endl;
 }
-void cFSMFunctorObject::Function3(int caller_id){
-  cout << "cFSMFunctorObject::Function3(" << caller_id << ")" << endl;
+void cFSTFunctorObject::Function3(int caller_id){
+  cout << "cFSTFunctorObject::Function3(" << caller_id << ")" << endl;
 }
-void cFSMFunctorObject::Function4(int caller_id){
-  cout << "cFSMFunctorObject::Function4(" << caller_id << ")" << endl;
+void cFSTFunctorObject::Function4(int caller_id){
+  cout << "cFSTFunctorObject::Function4(" << caller_id << ")" << endl;
 }
-void cFSMFunctorObject::Function5(int caller_id){
-  cout << "cFSMFunctorObject::Function5(" << caller_id << ")" << endl;
+void cFSTFunctorObject::Function5(int caller_id){
+  cout << "cFSTFunctorObject::Function5(" << caller_id << ")" << endl;
 }
-void cFSMFunctorObject::Function6(int caller_id){
-  cout << "cFSMFunctorObject::Function6(" << caller_id << ")" << endl;
+void cFSTFunctorObject::Function6(int caller_id){
+  cout << "cFSTFunctorObject::Function6(" << caller_id << ")" << endl;
 }
-void cFSMFunctorObject::Function7(int caller_id){
-  cout << "cFSMFunctorObject::Function7(" << caller_id << ")" << endl;
+void cFSTFunctorObject::Function7(int caller_id){
+  cout << "cFSTFunctorObject::Function7(" << caller_id << ")" << endl;
 }
-void cFSMFunctorObject::Function8(int caller_id){
-  cout << "cFSMFunctorObject::Function8(" << caller_id << ")" << endl;
+void cFSTFunctorObject::Function8(int caller_id){
+  cout << "cFSTFunctorObject::Function8(" << caller_id << ")" << endl;
 }
-void cFSMFunctorObject::Function9(int caller_id){
-  cout << "cFSMFunctorObject::Function9(" << caller_id << ")" << endl;
+void cFSTFunctorObject::Function9(int caller_id){
+  cout << "cFSTFunctorObject::Function9(" << caller_id << ")" << endl;
 }
 
 
-cFSMDB::cFSMDB(int rng_seed)
+cFSTSpace::cFSTSpace(int rng_seed)
 : m_rng(new Apto::RNG::AvidaRNG(rng_seed))
 //, m_kinetics(m_rng)
 , m_collision_scheduler(0, m_rng)
@@ -603,18 +641,18 @@ cFSMDB::cFSMDB(int rng_seed)
 , m_functors(10)
 , m_functor_object(*this)
 {
-  m_functors[0] = FSMFunctor(&m_functor_object, &cFSMFunctorObject::Function0);
-  m_functors[1] = FSMFunctor(&m_functor_object, &cFSMFunctorObject::Function1);
-  m_functors[2] = FSMFunctor(&m_functor_object, &cFSMFunctorObject::Function2);
-  m_functors[3] = FSMFunctor(&m_functor_object, &cFSMFunctorObject::Function3);
-  m_functors[4] = FSMFunctor(&m_functor_object, &cFSMFunctorObject::Function4);
-  m_functors[5] = FSMFunctor(&m_functor_object, &cFSMFunctorObject::Function5);
-  m_functors[6] = FSMFunctor(&m_functor_object, &cFSMFunctorObject::Function6);
-  m_functors[7] = FSMFunctor(&m_functor_object, &cFSMFunctorObject::Function7);
-  m_functors[8] = FSMFunctor(&m_functor_object, &cFSMFunctorObject::Function8);
-  m_functors[9] = FSMFunctor(&m_functor_object, &cFSMFunctorObject::Function9);
+  m_functors[0] = FSMFunctor(&m_functor_object, &cFSTFunctorObject::Function0);
+  m_functors[1] = FSMFunctor(&m_functor_object, &cFSTFunctorObject::Function1);
+  m_functors[2] = FSMFunctor(&m_functor_object, &cFSTFunctorObject::Function2);
+  m_functors[3] = FSMFunctor(&m_functor_object, &cFSTFunctorObject::Function3);
+  m_functors[4] = FSMFunctor(&m_functor_object, &cFSTFunctorObject::Function4);
+  m_functors[5] = FSMFunctor(&m_functor_object, &cFSTFunctorObject::Function5);
+  m_functors[6] = FSMFunctor(&m_functor_object, &cFSTFunctorObject::Function6);
+  m_functors[7] = FSMFunctor(&m_functor_object, &cFSTFunctorObject::Function7);
+  m_functors[8] = FSMFunctor(&m_functor_object, &cFSTFunctorObject::Function8);
+  m_functors[9] = FSMFunctor(&m_functor_object, &cFSTFunctorObject::Function9);
 }
-int cFSMDB::InsertSequence(const Apto::String& seq) {
+int cFSTSpace::InsertSequence(const Apto::String& seq) {
   if (!m_seqs.Has(seq)) {
     Apto::Array<cHit, Apto::Smart> hits(bScanForLabels(seq, m_label_utils));
     cSequence* seq_ptr = m_seqs.Insert(seq);
@@ -639,7 +677,7 @@ int cFSMDB::InsertSequence(const Apto::String& seq) {
     return seq_id;
   } else { return m_seqs.GetID(seq); }
 }
-void cFSMDB::UnlinkSeqLbls(int seq_id) {
+void cFSTSpace::UnlinkSeqLbls(int seq_id) {
   cSequence* seq_ptr = m_seqs.Get(seq_id);
   if (seq_ptr) {
     for (Apto::Map<int, Apto::Array<int> >::KeyIterator it = seq_ptr->m_labels.Keys(); it.Next();) {
@@ -651,11 +689,11 @@ void cFSMDB::UnlinkSeqLbls(int seq_id) {
     seq_ptr->m_labels.Clear();
   }
 }
-bool cFSMDB::RemoveSequence(int seq_id) {
+bool cFSTSpace::RemoveSequence(int seq_id) {
   UnlinkSeqLbls(seq_id);
   return m_seqs.Delete(seq_id);
 }
-int cFSMDB::CreateStrand() {
+int cFSTSpace::CreateStrand() {
   /* Get or create strand and sequence */
   cStrand* strand_ptr = m_bindables.Create<cStrand>();
   strand_ptr->m_seq_id = -1;
@@ -664,12 +702,12 @@ int cFSMDB::CreateStrand() {
   m_collision_scheduler.AdjustPriority(strand_id, 0);
   return strand_id;
 }
-int cFSMDB::CreateStrand(const Apto::String &seq) {
+int cFSTSpace::CreateStrand(const Apto::String &seq) {
   int strand_id = CreateStrand();
   AssociateSeqToStrand(strand_id, seq);
   return strand_id;
 }
-void cFSMDB::AssociateSeqToStrand(int strand_id, const Apto::String &seq) {
+void cFSTSpace::AssociateSeqToStrand(int strand_id, const Apto::String &seq) {
   cStrand* strand_ptr = m_bindables.Get<cStrand>(strand_id); assert(NULL != strand_ptr);
   int old_seq_id = strand_ptr->m_seq_id;
 
@@ -697,7 +735,7 @@ void cFSMDB::AssociateSeqToStrand(int strand_id, const Apto::String &seq) {
   }
   m_collision_scheduler.AdjustPriority(strand_id, seq.GetSize());
 }
-void cFSMDB::RemoveStrand(int strand_id) {
+void cFSTSpace::RemoveStrand(int strand_id) {
   /* Extract a list of half binding IDs in the parent.  */
   cStrand* par = m_bindables.Get<cStrand>(strand_id); assert(NULL != par);
   Apto::Set<int> par_hb_ids(CollapseSetMap(par->m_bindpts));
@@ -708,7 +746,7 @@ void cFSMDB::RemoveStrand(int strand_id) {
     int pos = hb->m_pos;
     int len = hb->m_len;
 
-    int o_hb_id = hb->m_other_half_binding_id;
+    int o_hb_id = hb->m_other_hb_id;
     cHalfBinding *o_hb = m_half_bindings.Get(o_hb_id);
     int o_pos = o_hb->m_pos;
     cBindable *o_par = m_bindables.Get(o_hb->m_parent_id);
@@ -725,7 +763,7 @@ void cFSMDB::RemoveStrand(int strand_id) {
   /* Delete strand. */
   m_bindables.Delete(strand_id);
 }
-void cFSMDB::RemoveSubstrand(int strand_id, int from_pos, int to_pos, int &ret_d0_id, int &ret_d1_id) {
+void cFSTSpace::RemoveSubstrand(int strand_id, int from_pos, int to_pos, int &ret_d0_id, int &ret_d1_id) {
   cStrand* par = m_bindables.Get<cStrand>(strand_id);
   if (NULL == par) { return; }
 
@@ -787,7 +825,7 @@ void cFSMDB::RemoveSubstrand(int strand_id, int from_pos, int to_pos, int &ret_d
       hb->m_pos = ofs_pos;
       for (int i=0; i < len; i++) { d1->m_bindpts[ofs_pos+i].Insert(hb_id); }
     } else {
-      int o_hb_id = hb->m_other_half_binding_id;
+      int o_hb_id = hb->m_other_hb_id;
       cHalfBinding *o_hb = m_half_bindings.Get(o_hb_id);
       int o_pos = o_hb->m_pos;
       cBindable *o_par = m_bindables.Get(o_hb->m_parent_id);
@@ -802,10 +840,10 @@ void cFSMDB::RemoveSubstrand(int strand_id, int from_pos, int to_pos, int &ret_d
   /* Delete parent strand. */
   RemoveStrand(strand_id);
 }
-void cFSMDB::SplitStrand(int strand_id, int at_pos, int &ret_d0_id, int &ret_d1_id) {
+void cFSTSpace::SplitStrand(int strand_id, int at_pos, int &ret_d0_id, int &ret_d1_id) {
   RemoveSubstrand(strand_id, at_pos, at_pos, ret_d0_id, ret_d1_id);
 }
-void cFSMDB::JoinStrands(int strand_0_id, int strand_1_id, int &ret_daughter_id) {
+void cFSTSpace::JoinStrands(int strand_0_id, int strand_1_id, int &ret_daughter_id) {
   cStrand* p0 = m_bindables.Get<cStrand>(strand_0_id);
   cStrand* p1 = m_bindables.Get<cStrand>(strand_1_id);
   if ((NULL == p0) || (NULL == p1)) { return; }
@@ -846,33 +884,33 @@ void cFSMDB::JoinStrands(int strand_0_id, int strand_1_id, int &ret_daughter_id)
   RemoveStrand(strand_0_id);
   RemoveStrand(strand_1_id);
 }
-void cFSMDB::InsertSubstrand(int strand_id, int substrand_id, int at_position, int &ret_daughter_id) {
+void cFSTSpace::InsertSubstrand(int strand_id, int substrand_id, int at_position, int &ret_daughter_id) {
   int l_id = -1, r_id = -1;
   SplitStrand(strand_id, at_position, l_id, r_id);
   if (0 <= l_id) { JoinStrands(l_id, substrand_id, substrand_id); }
   if (0 <= r_id) { JoinStrands(substrand_id, r_id, substrand_id); }
   ret_daughter_id = substrand_id;
 }
-void cFSMDB::AlterSubstrand(int strand_id, int new_substrand_id, int from_pos, int to_pos, int &ret_daughter_id) {
+void cFSTSpace::AlterSubstrand(int strand_id, int new_substrand_id, int from_pos, int to_pos, int &ret_daughter_id) {
   int l_id = -1, r_id = -1;
   RemoveSubstrand(strand_id, from_pos, to_pos, l_id, r_id);
   if (0 <= l_id) { JoinStrands(l_id, new_substrand_id, new_substrand_id); }
   if (0 <= r_id) { JoinStrands(new_substrand_id, r_id, new_substrand_id); }
   ret_daughter_id = new_substrand_id;
 }
-int cFSMDB::CreateFSMBootstrap() {
-  cFSMBootstrap* ptr = m_bindables.Create<cFSMBootstrap>();
+int cFSTSpace::CreateFSMBootstrap() {
+  cFSTBootstrap* ptr = m_bindables.Create<cFSTBootstrap>();
   int id = ptr->ID();
   return 0;
 }
-bool cFSMDB::SingleCollision() {
+bool cFSTSpace::SingleCollision() {
   /* Get two molecules to collide. */
   int bindable_id_0 = m_collision_scheduler.Next();
   int bindable_id_1 = m_collision_scheduler.Next();
   if ((bindable_id_0 == -1) || (bindable_id_1 == -1)) { return false; }
   return Collide(bindable_id_0, bindable_id_1);
 }
-bool cFSMDB::Collide(int bbl_id_0, int bbl_id_1) {
+bool cFSTSpace::Collide(int bbl_id_0, int bbl_id_1) {
   cBindable* bbl_0 = m_bindables.Get<cBindable>(bbl_id_0);
   cBindable* bbl_1 = m_bindables.Get<cBindable>(bbl_id_1);
   /* Brainstorming ... display bindables as strings. */
@@ -990,25 +1028,7 @@ bool cFSMDB::Collide(int bbl_id_0, int bbl_id_1) {
       /* Flip a loaded coin to see whether the binding would succeed. */
       bool does_bind = false;
       if (can_bind) { does_bind = (m_rng->GetDouble(0., 1.) < binding_probability); }
-      if (can_bind && does_bind) {
-        /* If binding is possible and will succeed, bind! */
-        cHalfBinding *fwd_hb = m_half_bindings.Create();
-        cHalfBinding *rvc_hb = m_half_bindings.Create();
-        m_unbinding_scheduler.Resize(m_half_bindings.GetMaxCt());
-        fwd_hb->Set(bbl_id_a, fwd_pos, len, rvc_hb->ID());
-        rvc_hb->Set(bbl_id_b, rvc_pos, len, fwd_hb->ID());
-        for (int j = 0; j < len; j++) {
-          /* In each molecule, mark all bound positions. */
-          int fwd_chk = fwd_pos + j;
-          int rvc_chk = rvc_pos + j;
-          bbl_a->m_bindpts[fwd_chk].Insert(fwd_hb->ID());
-          bbl_b->m_bindpts[rvc_chk].Insert(rvc_hb->ID());
-          /* Brainstorming ... display binding info. */
-          //cout << "    " << fwd_hb->m_pos + j << ":" << rvc_hb->m_pos + j << endl;
-        }
-        m_unbinding_scheduler.AdjustPriority(fwd_hb->ID(), len);
-        m_unbinding_scheduler.AdjustPriority(rvc_hb->ID(), len);
-      }
+      if (can_bind && does_bind) { Bind(bbl_id_a, bbl_id_b, fwd_pos, rvc_pos, len); }
       delete t_fwd_hb;
       delete t_rvc_hb;
     }
@@ -1016,15 +1036,66 @@ bool cFSMDB::Collide(int bbl_id_0, int bbl_id_1) {
   /* FIXME: currently always returns true; should give meaning to retval, or remove. */
   return true;
 }
-bool cFSMDB::SingleUnbinding() {
+bool cFSTSpace::SingleUnbinding() {
   int fwd_hb_id = m_unbinding_scheduler.Next();
   if (fwd_hb_id == -1) { return false; }
-  return Unbind(fwd_hb_id);
+  return MaybeUnbind(fwd_hb_id);
 }
-bool cFSMDB::Unbind(int fwd_hb_id) {
+bool cFSTSpace::Bind(int fwd_id, int rvc_id, int fwd_pos, int rvc_pos, int len) {
+  cBindable* fwd = m_bindables.Get<cBindable>(fwd_id);
+  cBindable* rvc = m_bindables.Get<cBindable>(rvc_id);
+  /* FIXME: should the following two lines be replaced by asserts? */
+  if ((!fwd) || (!rvc)) { return false; }
+  if ((!fwd->IsBindable(fwd_pos, len, *this)) || (!rvc->IsBindable(rvc_pos, len, *this))) { return false; }
+
+  cHalfBinding *fwd_hb = m_half_bindings.Create();
+  cHalfBinding *rvc_hb = m_half_bindings.Create();
+  m_unbinding_scheduler.Resize(m_half_bindings.GetMaxCt());
+  fwd_hb->Set(fwd_id, fwd_pos, len, rvc_hb->ID());
+  rvc_hb->Set(rvc_id, rvc_pos, len, fwd_hb->ID());
+  for (int j = 0; j < len; j++) {
+    /* In each molecule, mark all bound positions. */
+    int fwd_chk = fwd_pos + j;
+    int rvc_chk = rvc_pos + j;
+    fwd->m_bindpts[fwd_chk].Insert(fwd_hb->ID());
+    rvc->m_bindpts[rvc_chk].Insert(rvc_hb->ID());
+  }
+  m_unbinding_scheduler.AdjustPriority(fwd_hb->ID(), len);
+  m_unbinding_scheduler.AdjustPriority(rvc_hb->ID(), len);
+
+  return true;
+}
+bool cFSTSpace::Unbind(int fwd_hb_id) {
   cHalfBinding *fwd_hb = m_half_bindings.Get(fwd_hb_id);
-  int rvc_hb_id = fwd_hb->m_other_half_binding_id;
+  /* FIXME: should the following be replaced by an assert? */
+  if (!fwd_hb) { return false; }
+  int rvc_hb_id = fwd_hb->m_other_hb_id;
   cHalfBinding *rvc_hb = m_half_bindings.Get(rvc_hb_id);
+  /* FIXME: should the following be replaced by an assert? */
+  if (!rvc_hb) { return false; }
+  int fwd_id = fwd_hb->m_parent_id;
+  int rvc_id = rvc_hb->m_parent_id;
+  cBindable* fwd = m_bindables.Get<cBindable>(fwd_id);
+  cBindable* rvc = m_bindables.Get<cBindable>(rvc_id);
+  /* FIXME: should the following be replaced by an assert? */
+  if ((!fwd) || (!rvc)) { return false; }
+  for (int j = 0; j < fwd_hb->m_len; j++) {
+    /* In each molecule, mark all bound positions. */
+    int lbl_chk = fwd_hb->m_pos + j;
+    int rvc_chk = rvc_hb->m_pos + j;
+    fwd->m_bindpts[lbl_chk].Remove(fwd_hb->ID());
+    rvc->m_bindpts[rvc_chk].Remove(rvc_hb->ID());
+  }
+  m_unbinding_scheduler.AdjustPriority(fwd_hb->ID(), 0.);
+  m_unbinding_scheduler.AdjustPriority(rvc_hb->ID(), 0.);
+  m_half_bindings.Delete(fwd_hb->ID());
+  m_half_bindings.Delete(rvc_hb->ID());
+  return true;
+}
+bool cFSTSpace::MaybeUnbind(int fwd_hb_id) {
+  cHalfBinding *fwd_hb = m_half_bindings.Get(fwd_hb_id);
+  /* FIXME: should the following be replaced by an assert? */
+  if (!fwd_hb) { return false; }
   /*
   TODO: establish probability distributions for bindings.
 
@@ -1039,40 +1110,18 @@ bool cFSMDB::Unbind(int fwd_hb_id) {
   double point_binding_probability = 0.10910128185966073;
   double unbinding_probability = pow(1. - point_binding_probability, fwd_hb->m_len);
   bool does_unbind = (m_rng->GetDouble(0., 1.) < unbinding_probability);
-  if (does_unbind) {
-    int bbl_id_a = fwd_hb->m_parent_id;
-    int bbl_id_b = rvc_hb->m_parent_id;
-    cBindable* bbl_a = m_bindables.Get<cBindable>(bbl_id_a);
-    cBindable* bbl_b = m_bindables.Get<cBindable>(bbl_id_b);
-    Apto::String str_a(bbl_a->AsString(*this));
-    Apto::String str_b(bbl_b->AsString(*this));
-    //cout << "  bbl_id_a:" << bbl_id_a << ":str_a:" << str_a << ", bbl_id_b:" << bbl_id_b << ":str_b:" << str_b << endl;
-    for (int j = 0; j < fwd_hb->m_len; j++) {
-      /* In each molecule, mark all bound positions. */
-      int lbl_chk = fwd_hb->m_pos + j;
-      int rvc_chk = rvc_hb->m_pos + j;
-      bbl_a->m_bindpts[lbl_chk].Remove(fwd_hb->ID());
-      bbl_b->m_bindpts[rvc_chk].Remove(rvc_hb->ID());
-      /* Brainstorming ... display binding info. */
-      //cout << "  " << fwd_hb->m_pos + j << ":" << rvc_hb->m_pos + j << endl;
-    }
-    m_unbinding_scheduler.AdjustPriority(fwd_hb->ID(), 0.);
-    m_unbinding_scheduler.AdjustPriority(rvc_hb->ID(), 0.);
-    m_half_bindings.Delete(fwd_hb->ID());
-    m_half_bindings.Delete(rvc_hb->ID());
-  }
-  /* FIXME: currently always returns true; should give meaning to retval, or remove. */
-  return true;
+  if (does_unbind) { return Unbind(fwd_hb_id); }
+  return false;
 }
-bool cFSMDB::SingleRebinding() {
+bool cFSTSpace::SingleRebinding() {
   int fwd_hb_id = m_unbinding_scheduler.Next();
   if (fwd_hb_id == -1) { return false; }
   cHalfBinding *fwd_hb = m_half_bindings.Get(fwd_hb_id);
-  int rvc_hb_id = fwd_hb->m_other_half_binding_id;
+  int rvc_hb_id = fwd_hb->m_other_hb_id;
   cHalfBinding *rvc_hb = m_half_bindings.Get(rvc_hb_id);
   int bbl_id_a = fwd_hb->m_parent_id;
   int bbl_id_b = rvc_hb->m_parent_id;
-  Unbind(fwd_hb_id);
+  MaybeUnbind(fwd_hb_id);
   Collide(bbl_id_a, bbl_id_b);
   return true;
 }

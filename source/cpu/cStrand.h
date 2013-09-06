@@ -44,10 +44,10 @@ class IDs;
 class ObjBase;
 class cBasicLabelUtils;
 class cBindable;
-class cFSM;
-class cFSMFunctorObject;
-class cFSMDB;
-class cFSMDef;
+class cFST;
+class cFSTFunctorObject;
+class cFSTSpace;
+class cFSTMdl;
 class cHit;
 class cLabel;
 class cLabelDeletemeIdx;
@@ -289,12 +289,12 @@ public:
   int m_parent_id;
   int m_pos;
   int m_len;
-  int m_other_half_binding_id;
-  void Set(int parent_id, int pos, int len, int other_half_binding_id){
+  int m_other_hb_id;
+  void Set(int parent_id, int pos, int len, int other_hb_id){
     m_parent_id = parent_id;
     m_pos = pos;
     m_len = len;
-    m_other_half_binding_id = other_half_binding_id;
+    m_other_hb_id = other_hb_id;
   }
   void Print();
 };
@@ -339,7 +339,7 @@ public:
 class cLabel : public ObjBase {
 public:
   Apto::Set<int> m_seq_ids;
-  Apto::Set<int> m_fsm_def_ids;
+  Apto::Set<int> m_fst_mdl_ids;
 };
 
 class cLabeled : public ObjBase {
@@ -355,27 +355,34 @@ public:
   Apto::Set<int> m_strand_ids;
 };
 
-class cFSMDef : public cLabeled {
+class cFSTMdl : public cLabeled {
 public:
   Apto::Set<int> m_fsm_ids;
 public:
-  virtual ~cFSMDef(){}
+  virtual ~cFSTMdl(){}
 };
 
 class cFunction {
 public:
 };
 
-class cFSMBootstrapDef : public cFSMDef {
+class cFSTBootstrapDef : public cFSTMdl {
 public:
 };
 
-class cNFADef : public cFSMDef {
+class cNFADef : public cFSTMdl {
 public:
   /* Use: int next_state_id = m_transition_relation[state_id][symbol_id][next_state_idx]; */
   Apto::Map<int, Apto::Map<int, Apto::Array<int> > > m_transition_relation;
   /* Use: int function_id = m_function_relation[state_id][function_idx]; */
   Apto::Map<int, Apto::Array<int> > m_function_relation;
+  /*
+  Read and write heads are at fixed positions in the state machine; the state
+  machine is then bound to strands so that the read and write heads lie withing
+  the bound parts of the state machine. Then the heads read or write from
+  whatever strand is bound at the same position as the head.
+  */
+  int m_rhead_pos, m_rhead_ofs, m_whead_pos, m_whead_ofs;
 };
 
 class cBindable: public ObjBase {
@@ -384,35 +391,44 @@ public:
   Apto::Map<int, Apto::Set<int> > m_bindpts;
 public:
   virtual ~cBindable(){}
-  Apto::Array<int> GetBindings(cFSMDB &db);
-  virtual Apto::Map<int, Apto::Array<int> > &GetLabels(cFSMDB &db) = 0;
-  virtual Apto::String AsString(cFSMDB &db) = 0;
+  Apto::Array<int> GetBindings(cFSTSpace &db);
+  virtual Apto::Map<int, Apto::Array<int> > &GetLabels(cFSTSpace &db) = 0;
+  virtual Apto::String AsString(cFSTSpace &db) = 0;
+  virtual bool IsBindable(int pos, int len, cFSTSpace &db) = 0;
 };
 
 class cStrand : public cBindable {
 public:
   int m_seq_id;
-  virtual Apto::Map<int, Apto::Array<int> > &GetLabels(cFSMDB &db);
-  virtual Apto::String AsString(cFSMDB &db);
+  virtual Apto::Map<int, Apto::Array<int> > &GetLabels(cFSTSpace &db);
+  virtual Apto::String AsString(cFSTSpace &db);
+  /* TODO: establish and implement bindability criteria. */
+  virtual bool IsBindable(int pos, int len, cFSTSpace &db);
 };
 
-class cFSM : public cBindable {
+class cFST : public cBindable {
 public:
-  int m_fsm_def_id;
-  virtual Apto::Map<int, Apto::Array<int> > &GetLabels(cFSMDB &db);
-  virtual Apto::String AsString(cFSMDB &db);
+  int m_fst_mdl_id;
+  virtual Apto::Map<int, Apto::Array<int> > &GetLabels(cFSTSpace &db);
+  virtual Apto::String AsString(cFSTSpace &db);
+  /* TODO: establish and implement bindability criteria. */
+  virtual bool IsBindable(int pos, int len, cFSTSpace &db) { return true; }
+  virtual void Step(cFSTSpace &db) {}
 };
 
-class cFSMBootstrap : public cFSM {
+class cFSTBootstrap : public cFST {
 public:
 };
 
-class cNFA : public cFSM {
+class cNFA : public cFST {
 public:
   int m_state_id;
   Apto::SmartPtr<Apto::RNG::AvidaRNG> m_rng;
 public:
-  int Transition(int symbol_id, cFSMDB &db);
+  int Transition(int symbol_id, cFSTSpace &db);
+  int Read(cFSTSpace &db, int move = 1);
+  int Transition(cFSTSpace &db);
+  virtual void Step(cFSTSpace &db) { Transition(db); }
 };
 
 template <class T>
@@ -587,10 +603,10 @@ public:
   {};
 };
 
-class cFSMFunctorObject {
-  cFSMDB &m_db;
+class cFSTFunctorObject {
+  cFSTSpace &m_db;
 public:
-  cFSMFunctorObject(cFSMDB &db);
+  cFSTFunctorObject(cFSTSpace &db);
 public:
   void Function0(int caller_id);
   void Function1(int caller_id);
@@ -604,14 +620,14 @@ public:
   void Function9(int caller_id);
 };
 
-class cFSMDB {
+class cFSTSpace {
 public:
   Apto::SmartPtr<Apto::RNG::AvidaRNG> m_rng;
   cBasicLabelUtils m_label_utils;
 
   cLabelIdx m_lbls;
   cSeqIdx m_seqs;
-  ObjIdx<cFSMDef> m_fsm_defs;
+  ObjIdx<cFSTMdl> m_fst_mdls;
   ObjIdx<cBindable> m_bindables;
   ObjIdx<cHalfBinding> m_half_bindings;
   //cKinetics m_kinetics;
@@ -619,7 +635,7 @@ public:
   Apto::Scheduler::IntegratedDynamic m_unbinding_scheduler;
 
   Apto::Array<FSMFunctor> m_functors;
-  cFSMFunctorObject m_functor_object;
+  cFSTFunctorObject m_functor_object;
 
   int CreateStrand();
   int CreateStrand(const Apto::String &sequence);
@@ -637,11 +653,13 @@ public:
   bool SingleCollision();
   bool Collide(int bindable_id_0, int bindable_id_1);
   bool SingleUnbinding();
+  bool MaybeUnbind(int half_binding_id);
+  bool Bind(int fwd_id, int rvc_id, int fwd_pos, int rvc_pos, int len);
   bool Unbind(int half_binding_id);
   bool SingleRebinding();
 
 public:
-  cFSMDB(int rng_seed = -1);
+  cFSTSpace(int rng_seed = -1);
 protected:
   int InsertSequence(const Apto::String &sequence);
   void UnlinkSeqLbls(int seq_id);
