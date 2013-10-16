@@ -35,11 +35,233 @@ using namespace std;
 
 
 /*
+BOOKMARK 20130910-1547
+
+It appears to me that a step consists of three parts:
+- A state transition
+- Head moves
+- Possible strand alteration
+  - Which symbol to write if a symbol is written
+- Function call
+
+I could do all of this work in the function call. But then I would only be able
+to specify what function is called when the state is entered. So a good
+question to ask is: to what extent do I want to be able to encode functionality
+in the FST strand?
+
+My encoding scheme provides a function to call upon state entry. The function
+reads the symbols beneath each head and decides whether and how to modify bound
+strands and head positions.
+
+<read-symbol><optional-write-symbol><head-move><function-call><next-state>:
+When given symbol is read, head is moved, function is called, function uses
+optional write symbol if it writes, then transition to next state.
+
+<current-state><read-symbol>
+->
+<next-state><head-move><optional-tape-alter><optional-write-symbol>
+
+<current-state><read-symbol>
+->
+<next-state><entry-function>
+  <entry-function>:
+    - I
+    - D
+    - P
+    - N
+    - 0
+  Or:
+    - B 012 -> 02
+         ^     ^
+    - D 012 -> 02
+         ^      ^
+    - A 012 -> 0 12
+         ^       ^
+    - I 012 -> 01 2
+         ^      ^
+    - b 012 -> 0 2
+         ^     ^
+    - r 012 -> 0 2
+         ^      ^
+    - f 012 -> 0 2
+         ^       ^
+    - p 012 -> 012
+         ^     ^
+    - 0 012 -> 012
+         ^      ^
+    - n 012 -> 012
+         ^       ^
+
+BOOKMARK 20130910-1242
+
+Supposing I have one head. I want functions that can:
+- Move to next.
+- Move to previous.
+- Don't move.
+- Overwrite and move to next.
+- Overwrite and move to previous.
+- Overwrite and don't move.
+- Delete and move to previous.
+- Delete and move to next.
+- Insert before and don't move.
+- Insert before and move to previous
+- Insert after and don't move.
+- Insert after and move to next
+
+Actually this is a combination of the following:
+- Delete current, del, D
+- Insert before, inb, B
+- Insert after, ina, A
+- Move to next, nxt, N
+- Move to previous, prv, P
+- Do nothing, nil, 0
+
+Each of the first set of operations can be expressed as up to three of the
+second set. There are 6^3 = 216 combinations of these. This can be encoded with
+a single-byte character. If I decide to translate base-four to base-64, I would
+need two base-64 characters to encode one of these 216 combinaations. Two
+base-64 characters actually encode 4096 numbers, so I could modular arithmetic
+to get back down to 216.
+
+But many of these 216 are redundant, e.g.:
+- 000 = 0NP = 0PN = N0P = NP0 = P0N = PN0
+- 00N = 0N0 = N00 = NPN = NNP = PNN
+- 00P = 0P0 = P00 = PNP = PPN = NPP
+
+So part of a one-head state would be: f(s),g(s),h(s), d(s, c),
+with f,g,h functions from the second set, and d a transition.
+
+So a two-head transtion would be:
+f(s),g(s),h(s), d(s, c),
+
+
+BOOKMARK 20130910-1114
+
+Had some time to think more carefully about encoding method and number of state
+variables. First, regarding number of state variables, I think that there
+should be only one, rather that a variable for each head, because I think that
+making a NAND gate will be easier with three heads and one state variable.
+
+The state encoding is the most important part of the FST encoding. If I split
+the FST encoding on label boundaries into state encodings, then as long as the
+FST encoding is nonempty, every state encoding except the last is guaranteed to
+be nonempty.
+
+Since there is at least one character in the state encoding, the first
+character will determine the function to be called upon entering the state. The
+remaining characters in the state encoding will encode the transition relation
+for the state. The transition relation, again, maps the current state and the
+current symbol to a set of possible next states. The transition encoding
+characters have two pieces of information: the position of the character in the
+encoding, and the value of the character. i need to encode a combination of
+symbol and next state.
+
+I have two obvious choices:
+- Use the position to encode a symbol, and the value to encode a state.
+  - If I do this, and there are five transition-encoding characters, they will
+    encode transitions for exactly the first five symbols. This will heavily
+    bias encodings to use the early symbols more than the late symbols.
+- Use the position to encode a state, and the value to encode a symbol.
+  - If I do this, and there are five transition-encoding characters, they will
+    encode transitions for exactly the first five states. This will heavily
+    bias encodings to use the early states more than the late states.
+
+Either way, I think I'll use modular arithmetic to guarantee that each position
+or value maps to something valid. For example, if there are k states, v%k
+always maps v to one of the k states.
+
+If I assign each state a serial ID, (i.e., the first-encoded state gets ID 0,
+the next ID 1, and so on) and use the second choice above, then I think earlier
+state encodings will tend to be be more preserved. But assigning serial IDs
+ignores the values of the labels in the boundaries between state encodings.
+
+If I somehow use the labels to determine state IDs, I will break-up this
+tendency. One easy way to do this is to sort states lexically by label, and
+then assign serial IDs based on this sorted order. I think this will impose a
+tendency for the early part of each state encoding to be more preserved than
+the late part, and for lexically-early state encodings to more preserved than
+lexically-late state encodings.
+
+So I prefer the second choice.
+
+Now, to deal with more than one head: two heads means two symbols as input,
+three heads means three symbols, and so on. So if I have n symbols and k heads,
+I have n^k possible inputs. If there are m transition-encoding characters, then
+I'll use l characters at a time to encode an input, where l is the first
+integer such that n^k <= m^l.
+
+There may be one unlabeled state-encoding (always the last state encoding).
+This will be a default state.
+
+So in any state, if it receives an input that wasn't encoded, the input will
+transition to the default state.
+
+
+BOOKMARK 20130909-1842
+- In general, I want:
+  - Heads
+    - Can read, alter, insert, or delete
+    - Can be moved by integer amounts
+  - States
+    - Could have one state for each head
+      - Each state's transitions would depend only on corresponding head
+    - Could have a single state
+      - Transition would depend on all heads
+  - How to encode?
+
+- Definition
+  - S: symbol set
+  - Q: state set
+  - H: head set
+  - F: function set
+  - T: transition relation
+    - T:QxSx...xS->Q
+  - M: function relation
+    - M:Q->F
+- Encoding
+  - Single-head
+    - FST encoding 1:
+      - <FST-type label>
+      - State encoding
+        - symbol interpreted as function key
+        - symbol 1, maps to first state
+        - symbol 2, maps to second state
+        ...
+        - symbol m, maps to state m % (number of states)
+        - <State-id label>
+      - State encoding
+        ...
+
+      This encoding has the advantage that the first few transition encodings
+      will still map to the same first few states, if new states are added near
+      the end of the encoding.
+
+      It also has the advantage that the function corresponding to a state has
+      a fairly low probability of being changed.
+
+      Alternative: states could be sorted by their state-id labels before
+      assigning numbers. This would decrease the likelihood that a new state
+      would disrupt the order of states with early id labels.
+
 BOOKMARK 20130906-1222
 - Things I'd like state machines to be able to do:
   - Replicate
   - Input two binary numbers, and perform bitwise logic to produce a third number
+    - Inputs are supplied by Avida as an array of integers.
+    - I need two inputs.
+    - How, in general, might I preserve the ordering information of inputs as
+      they are loaded?
+      - Embed serial number into input strand.
+      - Timestamp input strand.
+      - Let system figure it out.
+    - For binary logic, I don't need to know about order. All I need to know is
+      that two distinct inputs have been loaded.
+  - How does output work?
+    - Probably by releasing a strand with a label for "output".
   - Navigate a maze / traverse a graph / Dijkstra
+
+  I've just realized that I don't necessarily need labels to be embedded in
+  strands! A label could simply be another molecule bound to a strand.
 
 BOOKMARK 20130901-2038
 - Trying to figure out how NFA read and write heads work. So far I know that:
@@ -2741,8 +2963,19 @@ TEST(Kinetics, collisions_and_unbinding_brainstorm) {
   }
 }
 
-TEST(IOxd, brainstorm) {
-  /* Input-output transducer tests. */
+namespace nInputOuputXDTests {
+/* Input-output transducer tests. */
+  TEST(BinaryInputXD, brainstorm) {
+    /*
+    - System sets organism input.
+    - An input transducer is chosen
+    */
+  }
+  TEST(BinaryOutputXD, brainstorm) {
+    /*
+    System gets 
+    */
+  }
 }
 
 TEST(NFA, brainstorm) {
@@ -2875,6 +3108,66 @@ TEST(NFA, brainstorm) {
   /* Brainstorm some encodings. Test each. */
   /* Cleanup. */
   db.m_fst_mdls.Delete(nfa_def->ID());
+}
+
+
+namespace nFSTEncodingTests {
+  TEST(FSTEncoding, brainstorm0) {
+    cFSTSpace db;
+    /*
+    Goal: encode a NAND gate. Three heads; first two are used for reading,
+    third is used for writing.
+    */
+`   /*
+    <entry-function><transition> encoding example
+
+    Has two states, "false" and default. Upon entry into false state, calls
+    function to output "B" for false. Upon entry into default state, calls
+    function to output "A" for true.
+
+    false state:
+      upon enter: output "B" for false
+      A,A-> false state
+      anything else-> default state
+
+      encoded by f AA abcd, which means:
+      - state is labelled abcd, assumes first state ID
+      - calls f upon entry
+      - input AA triggers transition to first state.
+      - all other inputs trigger transition to default state
+
+    default state:
+      upon enter: output "A" for true
+      A,A-> false state
+      anything else-> default state
+
+      encoded by t AA, which means:
+      - state is unlabelled, becomes default state
+      - calls t upon entry
+      - input AA triggers transition to first state.
+      - all other inputs trigger transition to default state
+
+    */
+    Apto::String seq0("acacaa f AA abcd t AA");
+    int id0 = db.CreateStrand(seq0);
+`   /*
+    Has two states, "false" and default. Upon entry into false state, calls
+    function to output "B" for false. Upon entry into default state, calls
+    function to output "A" for true.
+
+    false state:
+      upon enter: output "B" for false
+      A,A-> false state
+      anything else-> default state
+
+    default state:
+      upon enter: output "A" for true
+      A,A-> false state
+      anything else-> default state
+    */
+    Apto::String seq1("acacaa nnAA ");
+    int id1 = db.CreateStrand(seq1);
+  }
 }
 
 

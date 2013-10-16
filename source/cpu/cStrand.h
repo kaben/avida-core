@@ -420,6 +420,7 @@ class cFSTBootstrap : public cFST {
 public:
 };
 
+
 class cNFA : public cFST {
 public:
   int m_state_id;
